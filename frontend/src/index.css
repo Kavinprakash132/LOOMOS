@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans Tamil", "Noto Sans Devanagari", sans-serif;
+    caret-color: transparent;
+  }
+
+  input:not([readonly]),
+  textarea:not([readonly]),
+  [contenteditable="true"] {
+    caret-color: auto;
+  }
+}
+
+/* Highlight missing/invalid compulsory fields on failed submit or custom validation */
+form.was-validated input:invalid:not([readonly]):not([type="checkbox"]):not([type="radio"]),
+form.was-validated select:invalid,
+form.was-validated textarea:invalid,
+.field-invalid {
+  border-color: #e11d48 !important;
+  background-color: #fff1f2 !important;
+  box-shadow: 0 0 0 2px rgba(225, 29, 72, 0.16);
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .printable-area,
+  .printable-area * {
+    visibility: visible;
+  }
+  .printable-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: white;
+    padding: 16px;
+  }
+  .no-print {
+    display: none !important;
+  }
+}

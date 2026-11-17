@@ -1,0 +1,7 @@
+# Ensure shell scripts always use LF line endings in Linux cloud sandboxes
+* text=auto
+*.sh text eol=lf
+*.py text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.bat text eol=crlf

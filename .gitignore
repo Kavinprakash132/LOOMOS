@@ -1,0 +1,38 @@
+# Python & Backend
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Environment & Secrets (Never commit real .env or secret files)
+.env
+.env.*
+!.env.example
+!backend/.env.example
+!frontend/.env.example
+.jwt_secret
+
+# Local Databases, Backups, Uploads & Downloaded Raw Datasets
+data/
+backend/data/
+datasets/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# ML Checkpoints (keep exported ONNX models trackable if needed)
+*.pt
+*.pth
+!*.onnx
+
+# Frontend & E2E Build/Cache Artifacts
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+playwright-report/
+test-results/
+
