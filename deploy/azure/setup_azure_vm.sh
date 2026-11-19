@@ -25,6 +25,7 @@ if [ ! -f /swapfile ]; then
 fi
 
 echo "==> [2/5] Installing Docker & Compose..."
+export DEBIAN_FRONTEND=noninteractive
 if ! command -v docker >/dev/null 2>&1; then
   apt-get update -y
   apt-get install -y ca-certificates curl gnupg git

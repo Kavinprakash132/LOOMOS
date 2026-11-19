@@ -6,8 +6,8 @@ RUN npm ci
 COPY frontend/ ./
 RUN npm run build
 
-# Stage 2: Python 3.13 + FastAPI + SQLite + ONNX Vision AI + built React SPA
-FROM python:3.13-slim
+# Stage 2: Python 3.12 + FastAPI + SQLite + ONNX Vision AI + built React SPA
+FROM python:3.12-slim-bookworm
 WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
