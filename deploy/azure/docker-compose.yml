@@ -1,0 +1,38 @@
+services:
+  loomos:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    container_name: loomos-app
+    restart: unless-stopped
+    environment:
+      - PORT=8000
+      - LOOMOS_DB_PATH=/data/loomos.db
+      - LOOMOS_UPLOAD_DIR=/data/uploads
+      - LOOMOS_BACKUP_DIR=/data/backups
+      - LOOMOS_DEMO_MODE=${LOOMOS_DEMO_MODE:-false}
+      - LOOMOS_AUTO_SEED_DEMO=${LOOMOS_AUTO_SEED_DEMO:-false}
+    volumes:
+      - /var/lib/loomos-data:/data
+    expose:
+      - "8000"
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: loomos-caddy
+    restart: unless-stopped
+    depends_on:
+      - loomos
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - LOOMOS_DOMAIN=${LOOMOS_DOMAIN:-:80}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:
