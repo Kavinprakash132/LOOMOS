@@ -25,19 +25,18 @@
 
 ---
 
-## 3. Actual Measured Results (AITEX Held-Out Test Split: 604–620 Patches, Only 27–28 Defect Patches)
+## 3. Actual Measured Results (AITEX Held-Out Test Split: 604 Patches — 27 Defect / 577 Clean)
 
 > [!NOTE]
-> **Metrics Priority & Imbalance Caveat:** Overall accuracy (`92.9%`–`96.7%`) is inflated because **95.5%** (`577/604`) of patches in the held-out test split are clean (`0` defects), and the test set contains **only 27 defect patches** (`28` in the first run). Always evaluate using **Defect Recall**, **Defect F1**, **Precision**, and the **Confusion Matrix**.
+> **Metrics Priority & Imbalance Caveat:** Overall accuracy (`93.54%`–`96.36%`) is inflated because **95.5%** (`577/604`) of patches in the held-out test split are clean (`0` defects), and the test set contains **only 27 defect patches**. Always evaluate using **Defect Recall**, **Defect F1**, **Precision**, and the **Confusion Matrix**.
 
-| Model & Pipeline | **Defect Recall** | **Defect F1** | Defect Prec | Macro-F1 | ROC-AUC | Overall Acc *(inflated)* | CPU ms/img | Confusion Matrix `[[TN,FP],[FN,TP]]` |
-|---|---:|---:|---:|---:|---:|---:|---:|---|
-| **`ResNet-18` + CLAHE + centered train crops** | 0.481 | **0.565** | **0.684** | **0.774** | **0.950** | 96.69% | 37.2 ms | `[[571, 6], [14, 13]]` |
-| `MobileNetV3-Small` (ImageNet, raw) | **0.607** | 0.436 | 0.340 | 0.699 | 0.895 | 92.90% | 19.6 ms *(6.5 ms cached)* | `[[559, 33], [11, 17]]` |
-| `MobileNetV3-Small` + CLAHE + centered train crops | 0.407 | 0.324 | 0.268 | 0.642 | 0.854 | 92.38% | **6.5 ms** | `[[547, 30], [16, 11]]` |
-| `SmallCNN` (4-layer scratch, raw) | **0.607** | 0.215 | 0.131 | 0.550 | 0.755 | 80.00% | 25.1 ms | `[[479, 113], [11, 17]]` |
+### Reconciled Phase 2 Production Comparison (`backend/scripts/train_and_export_vision.py`, `backend/data/vision/model_card.json`)
+| Model & Pipeline | Val-Tuned Cutoff | **Defect Recall** | **Defect F1** | Defect Prec | Macro-F1 | ROC-AUC | Overall Acc *(inflated)* | CPU ms/img | Confusion Matrix `[[TN,FP],[FN,TP]]` |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| **`ResNet-18 + CLAHE` *(Active ONNX Winner)*** | `0.30` | 0.370 | **0.476** | **0.667** | **0.729** | **0.959** | 96.36% | 44.3 ms *(~18 ms ONNX)* | `[[572, 5], [17, 10]]` |
+| `MobileNetV3-Small + CLAHE` | `0.45` | **0.481** | 0.400 | 0.342 | 0.683 | 0.924 | 93.54% | **10.7 ms** | `[[552, 25], [14, 13]]` |
 
-*(Validation peak on `ResNet-18 + CLAHE`: `val_Defect-F1 = 0.761`, `val_AUC = 0.976`.)*
+*(Validation peak on `ResNet-18 + CLAHE`: `val_Defect-F1 = 0.688`, `val_AUC = 0.974`. Exported to Two-Output `backend/data/vision/winning_model.onnx` (`44.70 MB`) returning `logits` + `conv_maps` for CPU Grad-CAM overlays on `/inspect`.)*
 
 ---
 

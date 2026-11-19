@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { apiRequest } from "../api/client";
+import { PageGuideBanner } from "../components/PageGuideBanner";
 import { EbAndStopsTab } from "../components/masters/EbAndStopsTab";
 import { LoomsTab } from "../components/masters/LoomsTab";
 import { TeamUnitTab } from "../components/masters/TeamUnitTab";
@@ -79,7 +80,11 @@ export function SettingsMastersPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-bold text-slate-900">{t("navSettings")}</h1>
+      <h1 className="text-xl font-bold text-slate-900">Shed Setup &amp; Masters</h1>
+
+      <PageGuideBanner
+        tip="Set up your shuttle looms, workers & wage rates, traders & cloth sorts, TNPDCL electricity slabs, and CSV historical imports here."
+      />
 
       {error && (
         <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-sm">

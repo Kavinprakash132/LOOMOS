@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import { AlertCircle, Calendar, ClipboardCheck, Plus, Save, Trash2, Users, X } from "lucide-react";
 import { apiRequest, formatDateDMY, generateUuid, localIsoDate, offsetLocalIsoDate } from "../api/client";
 import { ConfirmVoidModal } from "../components/ConfirmVoidModal";
+import { PageGuideBanner } from "../components/PageGuideBanner";
 import { useAuth } from "../context/AuthContext";
 import {
   AlertItem,
@@ -79,7 +80,7 @@ export function TodayShiftPage() {
         ]);
 
         setPrefill(pf);
-        if (!targetShift) setShiftNo(pf.suggested_shift);
+        if (!targetShift) setShiftNo(pf.shift_no);
         setWeavers(wv);
         setBeams(bm);
         setAlerts(al);
@@ -438,6 +439,14 @@ export function TodayShiftPage() {
 
       {error && <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-sm">{error}</div>}
       {success && <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm">{success}</div>}
+
+      <PageGuideBanner
+        steps={[
+          "Pick Date & Shift (Day / Night)",
+          "Type Metres Woven (or switch to Counter for Start→End)",
+          "Mark any Stopped loom & click Save Shift",
+        ]}
+      />
 
       {/* Smart Date & Shift Bar */}
       <div className="bg-white p-3.5 rounded-xl border border-slate-200 flex flex-wrap items-center justify-between gap-3">

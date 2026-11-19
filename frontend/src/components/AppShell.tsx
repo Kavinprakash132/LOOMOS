@@ -1,28 +1,155 @@
-import React from "react";
-import { NavLink } from "react-router-dom";
-import { BarChart3, ClipboardCheck, Camera, History, Layers, LogOut, Settings, Factory, Truck, Wallet } from "lucide-react";
+import React, { useMemo, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import {
+  BarChart3,
+  Calculator,
+  Camera,
+  ChevronDown,
+  ChevronRight,
+  ClipboardCheck,
+  Factory,
+  FileSpreadsheet,
+  History,
+  Layers,
+  LogOut,
+  Settings,
+  Sparkles,
+  TrendingUp,
+  Truck,
+  Wallet,
+  Zap,
+} from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { DemoBanner } from "./DemoBanner";
 
+interface SubNavItem {
+  to: string;
+  label: string;
+  shortLabel: string;
+  icon: React.ComponentType<{ className?: string }>;
+  ownerOnly?: boolean;
+  matchPath: string;
+  matchTab?: string;
+}
+
+interface MainSection {
+  id: "daily" | "money" | "tools";
+  title: string;
+  icon: React.ComponentType<{ className?: string }>;
+  ownerOnly?: boolean;
+  items: SubNavItem[];
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, setupStatus, lang, t, toggleLanguage, logout } = useAuth();
+  const location = useLocation();
+  const isOwner = user?.role === "OWNER";
 
-  const navItems = [
-    { to: "/dashboard", label: t("navDashboard"), icon: BarChart3, ownerOnly: false },
-    { to: "/today", label: t("navToday"), icon: ClipboardCheck, ownerOnly: false },
-    { to: "/beams", label: t("navBeams"), icon: Layers, ownerOnly: false },
-    { to: "/payroll", label: t("navPayroll"), icon: Wallet, ownerOnly: true },
-    { to: "/deliveries", label: t("navDeliveries"), icon: Truck, ownerOnly: true },
-    { to: "/inspect", label: t("navInspect"), icon: Camera, ownerOnly: false },
-    { to: "/settings", label: t("navSettings"), icon: Settings, ownerOnly: true },
-    { to: "/audit-log", label: t("navAudit"), icon: History, ownerOnly: true },
-  ].filter((item) => !item.ownerOnly || user?.role === "OWNER");
+  const sections: MainSection[] = useMemo(() => {
+    const raw: MainSection[] = [
+      {
+        id: "daily",
+        title: "Daily Shed",
+        icon: Factory,
+        items: [
+          { to: "/dashboard", label: "Home", shortLabel: "Home", icon: BarChart3, matchPath: "/dashboard" },
+          { to: "/today", label: "Today's Production", shortLabel: "Production", icon: ClipboardCheck, matchPath: "/today" },
+          { to: "/beams", label: "Beams & Yarn", shortLabel: "Beams", icon: Layers, matchPath: "/beams" },
+          { to: "/inspect", label: "Check Cloth Photo", shortLabel: "Cloth AI", icon: Camera, matchPath: "/inspect" },
+        ],
+      },
+      {
+        id: "money",
+        title: "Money & Bills",
+        icon: Wallet,
+        ownerOnly: true,
+        items: [
+          { to: "/payroll", label: "Worker Wages", shortLabel: "Wages", icon: Wallet, ownerOnly: true, matchPath: "/payroll" },
+          { to: "/deliveries", label: "Deliveries & EB", shortLabel: "Deliveries", icon: Truck, ownerOnly: true, matchPath: "/deliveries" },
+          {
+            to: "/analytics?tab=reports",
+            label: "Excel & Statements",
+            shortLabel: "Reports",
+            icon: FileSpreadsheet,
+            ownerOnly: true,
+            matchPath: "/analytics",
+            matchTab: "reports",
+          },
+        ],
+      },
+      {
+        id: "tools",
+        title: "Smart Tools",
+        icon: Sparkles,
+        items: [
+          {
+            to: "/analytics?tab=eb",
+            label: "EB Calculator & Power",
+            shortLabel: "EB Calc",
+            icon: Zap,
+            matchPath: "/analytics",
+            matchTab: "eb",
+          },
+          {
+            to: "/analytics?tab=forecast",
+            label: "Forecast & Beam ETA",
+            shortLabel: "Forecast",
+            icon: TrendingUp,
+            matchPath: "/analytics",
+            matchTab: "forecast",
+          },
+          {
+            to: "/analytics?tab=simulator",
+            label: "Expansion Planner",
+            shortLabel: "Expansion",
+            icon: Calculator,
+            ownerOnly: true,
+            matchPath: "/analytics",
+            matchTab: "simulator",
+          },
+          { to: "/settings", label: "Shed Setup", shortLabel: "Setup", icon: Settings, ownerOnly: true, matchPath: "/settings" },
+          { to: "/audit-log", label: "Edit History", shortLabel: "History", icon: History, ownerOnly: true, matchPath: "/audit-log" },
+        ],
+      },
+    ];
+
+    return raw
+      .filter((sec) => !sec.ownerOnly || isOwner)
+      .map((sec) => ({
+        ...sec,
+        items: sec.items.filter((it) => !it.ownerOnly || isOwner),
+      }))
+      .filter((sec) => sec.items.length > 0);
+  }, [isOwner]);
+
+  const currentTab = new URLSearchParams(location.search).get("tab") || "forecast";
+
+  const isItemActive = (item: SubNavItem): boolean => {
+    if (location.pathname !== item.matchPath) return false;
+    if (item.matchPath === "/analytics") {
+      return currentTab === (item.matchTab || "forecast");
+    }
+    return true;
+  };
+
+  const activeSection =
+    sections.find((s) => s.items.some((it) => isItemActive(it))) ?? sections[0];
+
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
+    daily: true,
+    money: true,
+    tools: true,
+  });
+
+  const toggleGroup = (id: string) => {
+    setOpenGroups((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-slate-50 text-slate-900">
-      {/* Desktop / Laptop Left Sidebar */}
+      {/* Desktop / Laptop Left Sidebar — 3 Main Sections with Sub-Sections */}
       <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 bg-slate-900 text-slate-100 no-print">
-        <div className="px-5 py-5 border-b border-slate-800 flex items-center gap-3">
+        <div className="px-5 py-4 border-b border-slate-800 flex items-center gap-3">
           <Factory className="w-7 h-7 text-amber-400 shrink-0" />
           <div className="min-w-0">
             <div className="font-bold tracking-tight text-lg">{t("appTitle")}</div>
@@ -34,29 +161,56 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-1 select-none">
-          {navItems.map((item) => {
-            const Icon = item.icon;
+        <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-2.5 select-none">
+          {sections.map((section) => {
+            const SectionIcon = section.icon;
+            const isOpen = openGroups[section.id] ?? true;
+            const hasActive = section.items.some((it) => isItemActive(it));
+
             return (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition ${
-                    isActive
-                      ? "bg-amber-500 text-slate-950"
-                      : "text-slate-300 hover:bg-slate-800 hover:text-white"
-                  }`
-                }
-              >
-                <Icon className="w-4 h-4 shrink-0" />
-                <span>{item.label}</span>
-              </NavLink>
+              <div key={section.id} className="space-y-1">
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(section.id)}
+                  className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider cursor-pointer transition ${
+                    hasActive ? "text-amber-300 bg-slate-800/70" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/40"
+                  }`}
+                >
+                  <span className="flex items-center gap-2">
+                    <SectionIcon className="w-3.5 h-3.5" />
+                    {section.title}
+                  </span>
+                  {isOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                </button>
+
+                {isOpen && (
+                  <div className="pl-2 space-y-0.5">
+                    {section.items.map((item) => {
+                      const Icon = item.icon;
+                      const active = isItemActive(item);
+                      return (
+                        <Link
+                          key={item.to}
+                          to={item.to}
+                          className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition ${
+                            active
+                              ? "bg-amber-500 text-slate-950 font-semibold shadow-sm"
+                              : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                          }`}
+                        >
+                          <Icon className="w-4 h-4 shrink-0" />
+                          <span className="truncate">{item.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             );
           })}
         </nav>
 
-        <div className="p-4 border-t border-slate-800 space-y-3">
+        <div className="p-4 border-t border-slate-800 space-y-2.5">
           <div className="flex items-center justify-between text-xs text-slate-300">
             <span className="truncate font-medium">
               {user?.full_name} ({user?.role})
@@ -66,14 +220,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <button
               type="button"
               onClick={() => void toggleLanguage()}
-              className="flex-1 py-1.5 px-2.5 rounded border border-slate-700 text-xs font-semibold hover:bg-slate-800"
+              className="flex-1 py-1.5 px-2.5 rounded border border-slate-700 text-xs font-semibold hover:bg-slate-800 cursor-pointer"
             >
               {lang === "en" ? "EN | தமிழ்" : "தமிழ் | EN"}
             </button>
             <button
               type="button"
               onClick={logout}
-              className="py-1.5 px-2.5 rounded bg-slate-800 hover:bg-rose-700 text-xs flex items-center gap-1"
+              className="py-1.5 px-2.5 rounded bg-slate-800 hover:bg-rose-700 text-xs flex items-center gap-1 cursor-pointer"
               title={t("logout")}
             >
               <LogOut className="w-3.5 h-3.5" />
@@ -107,29 +261,55 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
+      {/* Mobile Sub-Section Pill Bar (for active Main Section) */}
+      {activeSection && (
+        <div className="md:hidden bg-white border-b border-slate-200 px-3 py-2 flex items-center gap-1.5 overflow-x-auto no-print select-none">
+          {activeSection.items.map((item) => {
+            const Icon = item.icon;
+            const active = isItemActive(item);
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold shrink-0 transition ${
+                  active
+                    ? "bg-slate-900 text-white"
+                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                {item.shortLabel}
+              </Link>
+            );
+          })}
+        </div>
+      )}
+
       {/* Main Content */}
       <main className="flex-1 md:pl-64 pb-20 md:pb-8 flex flex-col">
         <DemoBanner />
         <div className="max-w-6xl w-full mx-auto p-4 md:p-6">{children}</div>
       </main>
 
-      {/* Mobile Bottom Nav */}
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-20 bg-white border-t border-slate-200 flex overflow-x-auto no-print py-1.5 px-1 select-none">
-        {navItems.map((item) => {
-          const Icon = item.icon;
+      {/* Mobile Bottom Nav — 3 Clean Main Sections */}
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-20 bg-white border-t border-slate-200 grid no-print py-1.5 px-2 select-none"
+        style={{ gridTemplateColumns: `repeat(${sections.length}, minmax(0, 1fr))` }}
+      >
+        {sections.map((section) => {
+          const Icon = section.icon;
+          const isCurrent = activeSection?.id === section.id;
+          const firstTarget = section.items[0]?.to ?? "/dashboard";
           return (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) =>
-                `flex flex-col items-center justify-center shrink-0 min-w-[68px] gap-0.5 px-1.5 py-1 text-[10px] font-medium ${
-                  isActive ? "text-amber-600" : "text-slate-500"
-                }`
-              }
+            <Link
+              key={section.id}
+              to={firstTarget}
+              className={`flex flex-col items-center justify-center gap-0.5 py-1 rounded-lg text-[11px] font-bold transition ${
+                isCurrent ? "text-amber-600 bg-amber-50/70" : "text-slate-500"
+              }`}
             >
               <Icon className="w-4 h-4" />
-              <span className="truncate max-w-[68px]">{item.label}</span>
-            </NavLink>
+              <span>{section.title}</span>
+            </Link>
           );
         })}
       </nav>

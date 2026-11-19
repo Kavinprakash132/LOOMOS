@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, Database, Download, FileSpreadsheet, Trash2, Truck, Upload, Zap } from "lucide-react";
+import { Link } from "react-router-dom";
+import { AlertTriangle, Database, Download, FileSpreadsheet, Plus, Trash2, Truck, Upload, Zap } from "lucide-react";
 import {
   apiRequest,
   downloadProtectedFile,
@@ -9,6 +10,7 @@ import {
   localIsoDate,
 } from "../api/client";
 import { ConfirmVoidModal } from "../components/ConfirmVoidModal";
+import { PageGuideBanner } from "../components/PageGuideBanner";
 import {
   Beam,
   DeliveryRecord,
@@ -53,6 +55,9 @@ export function DeliveriesPage() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [voidTarget, setVoidTarget] = useState<{ endpoint: string; label: string } | null>(null);
+  const [showDeliveryForm, setShowDeliveryForm] = useState(false);
+  const [showPaymentForm, setShowPaymentForm] = useState(false);
+  const [showExpenseForm, setShowExpenseForm] = useState(false);
 
   // Delivery form
   const [delTraderId, setDelTraderId] = useState<number>(0);
@@ -302,6 +307,10 @@ export function DeliveriesPage() {
       {error && <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-sm">{error}</div>}
       {success && <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm">{success}</div>}
 
+      <PageGuideBanner
+        tip="Record cloth deliveries (auto-checks if a trader cuts your per-metre rate), log money received, track shed expenses, and save EB meter snapshots or bills."
+      />
+
       <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-2">
         {[
           { id: "deliveries", label: `Deliveries & Rate Check (${deliveries.length})` },
@@ -326,7 +335,22 @@ export function DeliveriesPage() {
       {/* Tab 1: Deliveries & Rate Checker */}
       {tab === "deliveries" && (
         <div className="space-y-4">
-          <form onSubmit={submitDelivery} className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => setShowDeliveryForm((v) => !v)}
+              className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold cursor-pointer transition ${
+                showDeliveryForm
+                  ? "bg-slate-900 text-white"
+                  : "bg-amber-500 text-slate-950 hover:bg-amber-400 shadow-sm"
+              }`}
+            >
+              <Plus className="w-4 h-4" />
+              {showDeliveryForm ? "Close Challan Form" : "Add Delivery Challan"}
+            </button>
+          </div>
+          {showDeliveryForm && (
+          <form onSubmit={submitDelivery} className="bg-white p-4 rounded-xl border border-amber-300 shadow-sm space-y-3">
             <div>
               <h2 className="text-sm font-bold">Record Cloth Delivery Challan (Rate Checker Active)</h2>
               <p className="text-[11px] text-slate-500">
@@ -454,10 +478,11 @@ export function DeliveriesPage() {
                 ).
               </div>
             )}
-            <button type="submit" className="px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold">
+            <button type="submit" className="px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold cursor-pointer">
               Save Delivery Challan
             </button>
           </form>
+          )}
 
           <div className="space-y-2">
             {deliveries.map((d) => (
@@ -525,7 +550,23 @@ export function DeliveriesPage() {
             </table>
           </div>
 
-          <form onSubmit={submitPayment} className="bg-white p-4 rounded-xl border border-slate-200 grid sm:grid-cols-5 gap-2 items-end">
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => setShowPaymentForm((v) => !v)}
+              className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold cursor-pointer transition ${
+                showPaymentForm
+                  ? "bg-slate-900 text-white"
+                  : "bg-amber-500 text-slate-950 hover:bg-amber-400 shadow-sm"
+              }`}
+            >
+              <Plus className="w-4 h-4" />
+              {showPaymentForm ? "Close Payment Form" : "Record Trader Payment"}
+            </button>
+          </div>
+
+          {showPaymentForm && (
+          <form onSubmit={submitPayment} className="bg-white p-4 rounded-xl border border-amber-300 shadow-sm grid sm:grid-cols-5 gap-2 items-end">
             <div>
               <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Trader *</label>
               <select
@@ -558,9 +599,10 @@ export function DeliveriesPage() {
                 <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Reference (optional)</label>
                 <input placeholder="NEFT / UPI" value={payRef} onChange={(e) => setPayRef(e.target.value)} className="w-full px-2.5 py-2 rounded border border-slate-300 text-sm" />
               </div>
-              <button type="submit" className="px-3.5 py-2 rounded bg-slate-900 text-white text-xs font-semibold shrink-0">Add</button>
+              <button type="submit" className="px-3.5 py-2 rounded bg-slate-900 text-white text-xs font-semibold shrink-0 cursor-pointer">Add</button>
             </div>
           </form>
+          )}
 
           {payments.length > 0 && (
             <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
@@ -587,7 +629,22 @@ export function DeliveriesPage() {
       {/* Tab 3: Expenses */}
       {tab === "expenses" && (
         <div className="space-y-4">
-          <form onSubmit={submitExpense} className="bg-white p-4 rounded-xl border border-slate-200 grid sm:grid-cols-4 gap-2 items-end">
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowExpenseForm((v) => !v)}
+              className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold cursor-pointer transition ${
+                showExpenseForm
+                  ? "bg-slate-900 text-white"
+                  : "bg-amber-500 text-slate-950 hover:bg-amber-400 shadow-sm"
+              }`}
+            >
+              <Plus className="w-4 h-4" />
+              {showExpenseForm ? "Close Expense Form" : "Add Shed Expense"}
+            </button>
+          </div>
+          {showExpenseForm && (
+          <form onSubmit={submitExpense} className="bg-white p-4 rounded-xl border border-amber-300 shadow-sm grid sm:grid-cols-4 gap-2 items-end">
             <div>
               <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Expense Date *</label>
               <input type="date" required value={expDate} onChange={(e) => setExpDate(e.target.value)} className="w-full px-3 py-2 rounded border border-slate-300 text-sm" />
@@ -605,9 +662,10 @@ export function DeliveriesPage() {
                 <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Note (optional)</label>
                 <input value={expNote} onChange={(e) => setExpNote(e.target.value)} placeholder="Details" className="w-full px-2.5 py-2 rounded border border-slate-300 text-sm" />
               </div>
-              <button type="submit" className="px-3.5 py-2 rounded bg-slate-900 text-white text-xs font-semibold shrink-0">Save</button>
+              <button type="submit" className="px-3.5 py-2 rounded bg-slate-900 text-white text-xs font-semibold shrink-0 cursor-pointer">Save</button>
             </div>
           </form>
+          )}
           <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
             {expenses.map((e) => (
               <div key={e.id} className="px-4 py-2.5 text-xs flex justify-between items-center gap-2">
@@ -631,6 +689,17 @@ export function DeliveriesPage() {
       {/* Tab 4: EB Meter Readings, Bills & CSV Backfill */}
       {tab === "eb" && (
         <div className="space-y-4">
+          <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+            <span className="text-amber-950 font-medium">
+              Want to verify a TNPDCL bill or estimate EB cost from fabric metres without saving?
+            </span>
+            <Link
+              to="/analytics?tab=eb"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 text-slate-950 font-bold hover:bg-amber-400"
+            >
+              <Zap className="w-3.5 h-3.5" /> Open EB Bill Calculator →
+            </Link>
+          </div>
           <div className="grid md:grid-cols-2 gap-4">
             <form onSubmit={submitEbReading} className="bg-white p-4 rounded-xl border border-slate-200 space-y-2.5">
               <h2 className="text-sm font-bold flex items-center gap-1.5">

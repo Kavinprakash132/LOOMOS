@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, ArrowRightLeft, Layers, PackagePlus, Trash2, Unplug } from "lucide-react";
+import { AlertTriangle, ArrowRightLeft, Layers, PackagePlus, Plus, Trash2, Unplug } from "lucide-react";
 import { apiRequest, formatDateDMY, localIsoDate } from "../api/client";
 import { ConfirmVoidModal } from "../components/ConfirmVoidModal";
+import { PageGuideBanner } from "../components/PageGuideBanner";
 import { Beam, FabricSort, Loom, Trader, UnloadReason, WeftReceipt } from "../types/api";
 
 export function BeamsPage() {
@@ -10,6 +11,7 @@ export function BeamsPage() {
   const [traders, setTraders] = useState<Trader[]>([]);
   const [sorts, setSorts] = useState<FabricSort[]>([]);
   const [looms, setLooms] = useState<Loom[]>([]);
+  const [etaMap, setEtaMap] = useState<Record<number, { eta_date_p50: string; on_track: boolean }>>({});
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -40,22 +42,27 @@ export function BeamsPage() {
   const [returnedWeftKg, setReturnedWeftKg] = useState("0");
   const [actualWasteM, setActualWasteM] = useState("");
   const [voidWeftTarget, setVoidWeftTarget] = useState<{ id: number; label: string } | null>(null);
+  const [openDrawer, setOpenDrawer] = useState<"none" | "beam" | "weft">("none");
 
   const loadData = useCallback(async () => {
     setError(null);
     try {
-      const [b, wr, tr, sr, lm] = await Promise.all([
+      const [b, wr, tr, sr, lm, ov] = await Promise.all([
         apiRequest<Beam[]>("/beams"),
         apiRequest<WeftReceipt[]>("/weft-receipts"),
         apiRequest<Trader[]>("/traders"),
         apiRequest<FabricSort[]>("/fabric-sorts"),
         apiRequest<Loom[]>("/looms"),
+        apiRequest<{ beam_etas: { beam_id: number; eta_date_p50: string; on_track: boolean }[] }>("/analytics/overview").catch(() => ({ beam_etas: [] })),
       ]);
       setBeams(b);
       setReceipts(wr);
       setTraders(tr);
       setSorts(sr);
       setLooms(lm);
+      const map: Record<number, { eta_date_p50: string; on_track: boolean }> = {};
+      for (const row of ov.beam_etas ?? []) map[row.beam_id] = row;
+      setEtaMap(map);
       if (!traderId && tr[0]) setTraderId(tr[0].id);
       if (!sortId && sr[0]) setSortId(sr[0].id);
       if (!weftBeamId && b[0]) setWeftBeamId(b[0].id);
@@ -216,6 +223,43 @@ export function BeamsPage() {
       {error && <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-sm">{error}</div>}
       {success && <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm">{success}</div>}
 
+      <PageGuideBanner
+        steps={[
+          "Receive Warp Beam from Trader",
+          "Load Beam onto a Free Loom",
+          "Issue Weft Cones as Needed",
+          "Unload Empty Beam to Check Yarn Waste",
+        ]}
+      />
+
+      {/* Action Buttons to open forms only when needed */}
+      <div className="flex flex-wrap items-center gap-2.5">
+        <button
+          type="button"
+          onClick={() => setOpenDrawer((cur) => (cur === "beam" ? "none" : "beam"))}
+          className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-bold cursor-pointer transition ${
+            openDrawer === "beam"
+              ? "bg-slate-900 text-white"
+              : "bg-amber-500 text-slate-950 hover:bg-amber-400 shadow-sm"
+          }`}
+        >
+          <Plus className="w-4 h-4" />
+          {openDrawer === "beam" ? "Close Warp Beam Form" : "Receive New Warp Beam"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setOpenDrawer((cur) => (cur === "weft" ? "none" : "weft"))}
+          className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold cursor-pointer transition ${
+            openDrawer === "weft"
+              ? "bg-slate-900 text-white"
+              : "bg-white border border-slate-300 text-slate-800 hover:bg-slate-50"
+          }`}
+        >
+          <Plus className="w-4 h-4" />
+          {openDrawer === "weft" ? "Close Weft Form" : "Issue Weft Yarn Cones"}
+        </button>
+      </div>
+
       {/* Summary Strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="bg-white p-3.5 rounded-xl border border-slate-200">
@@ -236,9 +280,11 @@ export function BeamsPage() {
         </div>
       </div>
 
-      {/* Receive Warp Beam + Log Weft Yarn Forms */}
-      <div className="grid lg:grid-cols-2 gap-4">
-        <form onSubmit={handleCreateBeam} className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
+      {/* Collapsible Receive Warp Beam / Log Weft Yarn Forms */}
+      {openDrawer !== "none" && (
+        <div className="grid gap-4">
+        {openDrawer === "beam" && (
+        <form onSubmit={handleCreateBeam} className="bg-white p-4 rounded-xl border border-amber-300 shadow-sm space-y-3">
           <h2 className="text-sm font-bold flex items-center gap-1.5">
             <PackagePlus className="w-4 h-4 text-amber-600" />
             Receive New Warp Beam
@@ -342,13 +388,15 @@ export function BeamsPage() {
                 className="px-2.5 py-1.5 rounded border border-slate-300 text-sm"
               />
             </div>
-            <button type="submit" className="px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold">
+            <button type="submit" className="px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold cursor-pointer">
               Add Warp Beam
             </button>
           </div>
         </form>
+        )}
 
-        <form onSubmit={handleCreateWeft} className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
+        {openDrawer === "weft" && (
+        <form onSubmit={handleCreateWeft} className="bg-white p-4 rounded-xl border border-amber-300 shadow-sm space-y-3">
           <h2 className="text-sm font-bold">Issue Weft Yarn Bags / Cones to Beam</h2>
           <div className="grid sm:grid-cols-2 gap-2.5">
             <div>
@@ -410,11 +458,13 @@ export function BeamsPage() {
               />
             </div>
           </div>
-          <button type="submit" className="px-4 py-2 rounded-lg bg-amber-600 text-white text-xs font-semibold">
+          <button type="submit" className="px-4 py-2 rounded-lg bg-amber-600 text-white text-xs font-semibold cursor-pointer">
             Save Weft Issue
           </button>
         </form>
-      </div>
+        )}
+        </div>
+      )}
 
       {/* Beam List */}
       <div className="space-y-3">
@@ -444,6 +494,15 @@ export function BeamsPage() {
                   {b.due_date && (
                     <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-800 text-[11px] font-medium">
                       Due: {formatDateDMY(b.due_date)}
+                    </span>
+                  )}
+                  {b.status === "RUNNING" && etaMap[b.id] && (
+                    <span
+                      className={`px-2 py-0.5 rounded text-[11px] font-bold ${
+                        etaMap[b.id].on_track ? "bg-emerald-50 text-emerald-800" : "bg-rose-100 text-rose-800"
+                      }`}
+                    >
+                      ETA: {formatDateDMY(etaMap[b.id].eta_date_p50)} ({etaMap[b.id].on_track ? "On Track" : "Late"})
                     </span>
                   )}
                 </div>

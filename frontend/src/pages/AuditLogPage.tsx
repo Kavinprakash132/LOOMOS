@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiRequest, formatDateDMY, formatDateTimeIST, formatHoursFromMins, formatRupeesFromPaise } from "../api/client";
+import { PageGuideBanner } from "../components/PageGuideBanner";
 import { useAuth } from "../context/AuthContext";
 import { AuditLogEntry } from "../types/api";
 
@@ -124,6 +125,10 @@ export function AuditLogPage() {
           <option value="user">Users</option>
         </select>
       </div>
+
+      <PageGuideBanner
+        tip="Every edit, rate change, or voided record is logged automatically here with Before and After values so nothing is ever silently lost."
+      />
 
       <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto shadow-sm">
         <table className="min-w-full text-xs">

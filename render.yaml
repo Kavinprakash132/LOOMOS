@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: loomos-shed-manager
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: LOOMOS_DB_PATH
+        value: /app/backend/data/loomos_demo.db
+      - key: LOOMOS_DEMO_MODE
+        value: "true"
+      - key: LOOMOS_AUTO_SEED_DEMO
+        value: "true"

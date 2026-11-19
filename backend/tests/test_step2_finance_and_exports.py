@@ -106,7 +106,7 @@ def test_deliveries_rate_checker_ledger_csv_bom_and_sqlite_backup(client: TestCl
         },
     )
     assert eb_res.status_code == 201
-    assert eb_res.json()["energy_paise"] == 2808210
+    assert eb_res.json()["energy_paise"] == 2994955  # 2024-2026 live TNPDCL LA3A2: 500*445 + 4907*565
 
     # UTF-8 BOM CSV export check
     csv_res = client.get("/api/v1/exports/csv/deliveries", headers=headers)

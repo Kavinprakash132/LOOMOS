@@ -29,23 +29,10 @@ from sklearn.metrics import (
 from torch.utils.data import DataLoader, Dataset
 
 SEED = 42
-BACKEND_ROOT = Path(__file__).resolve().parents[1]
-CLOUD_AITEX_DIR = BACKEND_ROOT / "data" / "datasets" / "aitex_repo" / "data" / "aitex"
-LOCAL_FALLBACK_AITEX_DIR = Path(
+DEFAULT_AITEX_DIR = Path(
     r"C:\Users\praka\.gemini\antigravity\brain\dd8df6b2-d122-4817-8f8a-86e471411396\scratch\vision_gate\aitex_repo\data\aitex"
 )
-
-
-def _resolve_default_aitex_dir() -> Path:
-    env_dir = os.environ.get("LOOMOS_AITEX_DIR")
-    if env_dir:
-        return Path(env_dir).resolve()
-    if CLOUD_AITEX_DIR.exists():
-        return CLOUD_AITEX_DIR
-    return LOCAL_FALLBACK_AITEX_DIR
-
-
-DEFAULT_AITEX_DIR = _resolve_default_aitex_dir()
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
 VISION_OUT_DIR = BACKEND_ROOT / "data" / "vision"
 SAMPLES_DIR = VISION_OUT_DIR / "samples"
 
@@ -97,7 +84,7 @@ def load_strips(base: Path) -> tuple[list[dict], list[dict]]:
         if int((m_comb > 0).sum()) == 0:
             continue
         parts = stem.split("_")
-        code = parts[2] if len(parts) >= 3 else "000"
+        code = parts[1] if len(parts) >= 2 else "000"
         defect_strips.append({"id": stem, "code": code, "gray": gray, "mask": m_comb})
 
     clean_strips: list[dict] = []
@@ -248,7 +235,7 @@ def train_and_eval(
 ) -> tuple[nn.Module, dict]:
     pos_w = (total_train - pos_count) / max(1, pos_count)
     crit = nn.CrossEntropyLoss(weight=torch.tensor([1.0, pos_w], dtype=torch.float32))
-    opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
+    opt = torch.optim.AdamW([p for p in model.parameters() if p.requires_grad], lr=lr, weight_decay=1e-4)
     best_auc, best_state = -1.0, None
     t0 = time.perf_counter()
     for ep in range(1, epochs + 1):
@@ -407,6 +394,8 @@ def export_held_out_samples(pos_te: list[dict], neg_te: list[dict]) -> list[dict
 
 
 def main() -> None:
+    os.environ["OMP_NUM_THREADS"] = "8"
+    torch.set_num_threads(max(4, os.cpu_count() or 8))
     parser = argparse.ArgumentParser()
     parser.add_argument("--aitex-dir", type=Path, default=DEFAULT_AITEX_DIR)
     args = parser.parse_args()
@@ -457,6 +446,8 @@ def main() -> None:
     test_loader = DataLoader(MemDataset(test_items, eval_tf), batch_size=64, shuffle=False)
 
     m_mob = models.mobilenet_v3_small(weights=models.MobileNet_V3_Small_Weights.DEFAULT)
+    for p in m_mob.features[:6].parameters():
+        p.requires_grad = False
     m_mob.classifier[-1] = nn.Linear(m_mob.classifier[-1].in_features, 2)
     m_mob, mob_metrics = train_and_eval(
         "MobileNetV3-Small + CLAHE",
@@ -467,11 +458,14 @@ def main() -> None:
         test_loader,
         len(pos_tr),
         len(train_items),
-        epochs=12,
-        lr=4e-4,
+        epochs=6,
+        lr=6e-4,
     )
 
     m_res = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
+    for layer in (m_res.conv1, m_res.bn1, m_res.layer1, m_res.layer2):
+        for p in layer.parameters():
+            p.requires_grad = False
     m_res.fc = nn.Linear(m_res.fc.in_features, 2)
     m_res, res_metrics = train_and_eval(
         "ResNet-18 + CLAHE",
@@ -482,8 +476,8 @@ def main() -> None:
         test_loader,
         len(pos_tr),
         len(train_items),
-        epochs=10,
-        lr=3e-4,
+        epochs=6,
+        lr=5e-4,
     )
 
     # Select single winning model by held-out Defect-F1 (tie-break ROC-AUC)

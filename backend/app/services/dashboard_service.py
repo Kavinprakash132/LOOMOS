@@ -57,7 +57,7 @@ def compute_floor_dashboard(db: Session, *, period_start: date, period_end: date
     ).all()
     today_metres = sum((s.net_metres for s in today_shifts), Decimal("0.00")).quantize(Decimal("0.01"))
 
-    # Confirmed inspection defective metres in period (exclude inspections already added to a ShiftEntry)
+    # Confirmed inspection defective metres in period that are NOT already linked into a ShiftEntry (avoid double-counting)
     conf_insp = db.scalars(
         select(Inspection).where(
             Inspection.review_status == "CONFIRMED_DEFECT",

@@ -22,7 +22,7 @@ def _resolved_url() -> str:
     configured = config.get_main_option("sqlalchemy.url")
     if configured and "loomos.db" not in configured:
         return configured
-    return get_settings().resolved_database_url()
+    return f"sqlite:///{get_settings().db_path.as_posix()}"
 
 
 def run_migrations_offline() -> None:

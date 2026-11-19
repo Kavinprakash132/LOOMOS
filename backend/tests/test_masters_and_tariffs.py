@@ -6,7 +6,7 @@ from decimal import Decimal
 from fastapi.testclient import TestClient
 
 from app.models.core import EbTariffPlan, EbTariffSlab, ShiftEntry
-from app.services.eb_calculator import calculate_energy_charge_paise
+from app.services.eb_calculator import calculate_bill_breakdown_paise, calculate_energy_charge_paise
 
 
 def test_db_driven_tangedco_slab_math_matches_real_bills(client: TestClient, initialized_owner) -> None:
@@ -15,26 +15,35 @@ def test_db_driven_tangedco_slab_math_matches_real_bills(client: TestClient, ini
     assert len(plans) == 1
     p = plans[0]
 
-    # Reconstruct ORM plan from DB fields and verify all 5 real TANGEDCO bills (0 paise diff)
+    # Reconstruct ORM plan from DB fields and verify all live 2024-2026 TNPDCL LA3A2 bills (0 paise diff on CC!)
     orm_plan = EbTariffPlan(
         name=p["name"],
         billing_cycle_days=p["billing_cycle_days"],
         overhead_per_kw_paise=p["overhead_per_kw_paise"],
+        fixed_charge_per_kw_month_paise=p["fixed_charge_per_kw_month_paise"],
+        electricity_tax_bps=p["electricity_tax_bps"],
+        fppca_paise_per_unit=p["fppca_paise_per_unit"],
+        tax_on_gross=p["tax_on_gross"],
         effective_from=p["effective_from"],
         slabs=[EbTariffSlab(**{k: s[k] for k in ("min_unit", "max_unit", "rate_paise_per_unit")}) for s in p["slabs"]],
     )
-    expected_bills = [
-        # (units, exact_energy_paise, rounded_rupees_in_business_plan)
-        (8360, 3843300, 38433),
-        (6407, 2808210, 28082),
-        (2796, 894380, 8944),
-        (4346, 1715880, 17159),
-        (6361, 2783830, 27838),
+    expected_live_bills = [
+        # (units, recorded_demand_kw, exact_cc_paise, exact_tnpdcl_total_rs)
+        (79, 1.37, 0, 0),            # Free quota <= 1,000 units: CC, Fixed & E-Tax all waived!
+        (1828, 6.23, 407820, 5390),  # Jun 2026 live TNPDCL bill
+        (6361, 6.06, 2968965, 32282),  # Apr 2026 (P5)
+        (4346, 6.97, 1830490, 20328),  # Feb 2026 (P4)
+        (2796, 3.43, 954740, 11116),   # Dec 2025 (P3)
+        (6407, 6.64, 2994955, 32554),  # Oct 2025 (P2)
+        (8360, 7.62, 4098400, 44146),  # Aug 2025 (P1)
     ]
-    for units, exact_paise, doc_rupees in expected_bills:
-        calc_paise = calculate_energy_charge_paise(Decimal(units), orm_plan)
-        assert calc_paise == exact_paise
-        assert round(calc_paise / 100) == doc_rupees
+    for units, rec_kw, exact_cc_paise, live_total_rs in expected_live_bills:
+        calc_cc = calculate_energy_charge_paise(Decimal(units), orm_plan)
+        assert calc_cc == exact_cc_paise
+        bd = calculate_bill_breakdown_paise(
+            Decimal(units), orm_plan, sanctioned_kw=Decimal("10.00"), billing_days=60, recorded_demand_kw=Decimal(str(rec_kw))
+        )
+        assert abs(round(bd["net_bill_paise"] / 100) - live_total_rs) <= 1
 
 
 def test_all_four_wage_modes_and_dated_rate_history(client: TestClient, initialized_owner) -> None:

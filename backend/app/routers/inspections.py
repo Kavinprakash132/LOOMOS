@@ -216,13 +216,36 @@ def review_inspection(
     if payload.weaver_id is not None:
         insp.weaver_id = payload.weaver_id
 
+    old_linked_shift_id = insp.shift_entry_id
+    old_defective = insp.defective_metres or Decimal("0.00")
+
     insp.review_status = payload.review_status
     insp.reviewed_label = payload.reviewed_label.strip()
     insp.defective_metres = (
         payload.defective_metres if payload.review_status == "CONFIRMED_DEFECT" else Decimal("0.00")
     )
 
-    if (
+    if old_linked_shift_id is not None:
+        # Adjust previously linked shift entry by exact delta (idempotent on re-save or revert to Clean)
+        linked_shift = db.get(ShiftEntry, old_linked_shift_id)
+        if linked_shift and not linked_shift.is_deleted:
+            delta = insp.defective_metres - old_defective
+            if delta != Decimal("0.00"):
+                old_s_def = str(linked_shift.defective_metres)
+                linked_shift.defective_metres = max(
+                    Decimal("0.00"), (linked_shift.defective_metres or Decimal("0.00")) + delta
+                )
+                record_audit(
+                    db,
+                    entity_type="shift_entry",
+                    entity_id=linked_shift.id,
+                    action="UPDATE",
+                    changed_by=user.id,
+                    old_values={"defective_metres": old_s_def},
+                    new_values={"defective_metres": str(linked_shift.defective_metres)},
+                    reason=f"Updated defect metres from Photo Inspection #{insp.id} ({insp.reviewed_label})",
+                )
+    elif (
         payload.add_to_today_shift
         and payload.review_status == "CONFIRMED_DEFECT"
         and insp.defective_metres > Decimal("0.00")

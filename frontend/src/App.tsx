@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { AuditLogPage } from "./pages/AuditLogPage";
+import { AnalyticsReportsPage } from "./pages/AnalyticsReportsPage";
 import { BeamsPage } from "./pages/BeamsPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { DeliveriesPage } from "./pages/DeliveriesPage";
@@ -70,6 +71,7 @@ function AppRoutes() {
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/today" element={<TodayShiftPage />} />
         <Route path="/beams" element={<BeamsPage />} />
+        <Route path="/analytics" element={<AnalyticsReportsPage />} />
         <Route path="/inspect" element={<InspectPage />} />
         {user.role === "OWNER" && (
           <>

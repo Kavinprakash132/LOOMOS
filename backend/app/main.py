@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+import os
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -11,9 +14,7 @@ from sqlalchemy import text
 from app.core.config import BACKEND_ROOT, get_settings
 from app.core.database import Base, engine
 from app.core.i18n import get_translations
-from app.routers import auth, beams, dashboard, data_ops, finance, inspections, masters, payroll, settings as settings_router, setup, shifts
-
-FRONTEND_DIST_DIR = BACKEND_ROOT.parent / "frontend" / "dist"
+from app.routers import analytics, auth, beams, dashboard, data_ops, finance, inspections, masters, payroll, settings as settings_router, setup, shifts
 
 
 def create_app() -> FastAPI:
@@ -44,6 +45,7 @@ def create_app() -> FastAPI:
     app.include_router(data_ops.router)
     app.include_router(dashboard.router)
     app.include_router(inspections.router)
+    app.include_router(analytics.router)
 
     @app.get("/api/v1/health", tags=["system"])
     def health_check() -> dict[str, str]:
@@ -55,19 +57,26 @@ def create_app() -> FastAPI:
     def fetch_translations(lang: str) -> dict[str, str]:
         return get_translations(lang)
 
-    # Optional single-port static SPA serving when frontend/dist is built (helpful in cloud VMs)
-    index_html = FRONTEND_DIST_DIR / "index.html"
-    if cfg.serve_static and index_html.is_file():
-        assets_dir = FRONTEND_DIST_DIR / "assets"
+    # Single-container production mode: serve built React SPA if frontend/dist exists
+    dist_env = os.environ.get("LOOMOS_FRONTEND_DIST")
+    frontend_dist = Path(dist_env) if dist_env else (BACKEND_ROOT.parent / "frontend" / "dist")
+    if frontend_dist.is_dir() and (frontend_dist / "index.html").is_file():
+        assets_dir = frontend_dist / "assets"
         if assets_dir.is_dir():
-            app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="frontend-assets")
+            app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="spa-assets")
+
+        index_html = frontend_dist / "index.html"
 
         @app.get("/{full_path:path}", include_in_schema=False)
-        def serve_spa_fallback(full_path: str) -> FileResponse:
+        def serve_spa(full_path: str):
             if full_path.startswith("api/"):
                 raise HTTPException(status_code=404, detail="API endpoint not found")
-            candidate = (FRONTEND_DIST_DIR / full_path).resolve()
-            if full_path and candidate.is_file() and FRONTEND_DIST_DIR.resolve() in candidate.parents:
+            candidate = (frontend_dist / full_path).resolve()
+            if (
+                full_path
+                and candidate.is_file()
+                and frontend_dist.resolve() in candidate.parents
+            ):
                 return FileResponse(str(candidate))
             return FileResponse(str(index_html))
 

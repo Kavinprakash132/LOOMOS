@@ -68,12 +68,14 @@ def populate_demo_shed(db_path: Path) -> dict[str, str | int]:
         Alert,
         Beam,
         BeamLoading,
+        DefectPrediction,
         Delivery,
         DeliveryItem,
         EbBill,
         EbReading,
         Expense,
         FabricSort,
+        Inspection,
         Loom,
         Payslip,
         ShedCalendar,
@@ -90,6 +92,13 @@ def populate_demo_shed(db_path: Path) -> dict[str, str | int]:
     )
     from app.services.eb_calculator import calculate_energy_charge_paise
     from app.services.seed_defaults import seed_default_tariff_and_stops
+    from app.services.vision_service import (
+        MODEL_CARD_PATH,
+        MODEL_PATH,
+        SAMPLES_DIR,
+        analyze_cloth_image_bytes,
+        load_model_card,
+    )
 
     engine = build_engine(f"sqlite:///{db_path.as_posix()}")
     SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
@@ -532,6 +541,50 @@ def populate_demo_shed(db_path: Path) -> dict[str, str | int]:
                 status="OPEN",
             ),
         ])
+
+        # Seed 2 sample cloth inspections (1 CONFIRMED_DEFECT + 1 CONFIRMED_CLEAN) without adding shift defects yet
+        if MODEL_PATH.exists() and MODEL_CARD_PATH.exists():
+            card = load_model_card()
+            samples = card.get("samples", [])
+            defect_s = next((s for s in samples if s.get("is_defect")), None)
+            clean_s = next((s for s in samples if not s.get("is_defect")), None)
+            demo_samples = [
+                (defect_s, "CONFIRMED_DEFECT", defect_s["ground_truth_label"] if defect_s else "Broken End", looms[0].id, b_101.id, w_arumugam.id),
+                (clean_s, "CONFIRMED_CLEAN", "Clean Cloth", looms[1].id, b_102.id, w_ramesh.id),
+            ]
+            for s_meta, r_status, r_label, l_id, b_id, w_id in demo_samples:
+                if not s_meta:
+                    continue
+                s_path = SAMPLES_DIR / s_meta["filename"]
+                if not s_path.exists():
+                    continue
+                pred_res = analyze_cloth_image_bytes(s_path.read_bytes())
+                insp_row = Inspection(
+                    loom_id=l_id,
+                    beam_id=b_id,
+                    weaver_id=w_id,
+                    image_path=pred_res["raw_filename"],
+                    heatmap_path=pred_res["heatmap_filename"],
+                    review_status=r_status,
+                    reviewed_label=r_label,
+                    defective_metres=Decimal("0.00"),
+                    is_reference_sample=True,
+                    inspected_at=now_utc - timedelta(hours=3),
+                    created_by=sup.id,
+                )
+                db.add(insp_row)
+                db.flush()
+                db.add(
+                    DefectPrediction(
+                        inspection_id=insp_row.id,
+                        model_version=pred_res["model_version"],
+                        predicted_label=pred_res["predicted_label"],
+                        confidence=Decimal(str(pred_res["confidence"])),
+                        threshold_used=Decimal(str(pred_res["threshold_used"])),
+                        is_uncertain=pred_res["is_uncertain"],
+                        inference_ms=Decimal(str(pred_res["inference_ms"])),
+                    )
+                )
 
         record_audit(
             db,

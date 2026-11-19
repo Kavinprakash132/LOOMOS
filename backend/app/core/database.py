@@ -30,7 +30,7 @@ def _configure_sqlite_pragmas(engine: Engine) -> None:
 def build_engine(database_url: str | None = None) -> Engine:
     """Create a configured SQLAlchemy engine for SQLite or PostgreSQL."""
     settings = get_settings()
-    url = database_url or settings.resolved_database_url()
+    url = database_url or f"sqlite:///{settings.db_path.as_posix()}"
     connect_args = {"check_same_thread": False} if url.startswith("sqlite") else {}
     eng = create_engine(url, connect_args=connect_args, future=True)
     if url.startswith("sqlite"):

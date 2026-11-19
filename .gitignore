@@ -1,38 +1,31 @@
-# Python & Backend
+# Python
 .venv/
-venv/
 __pycache__/
 *.py[cod]
 .pytest_cache/
-
-# Environment & Secrets (Never commit real .env or secret files)
 .env
-.env.*
-!.env.example
-!backend/.env.example
-!frontend/.env.example
-.jwt_secret
 
-# Local Databases, Backups, Uploads & Downloaded Raw Datasets
-data/
-backend/data/
-datasets/
+# Node / Frontend
+node_modules/
+frontend/dist/
+frontend/e2e/screenshots/
+*.tsbuildinfo
+
+# Databases, private backups, uploads & personal godown imports (NEVER push real shed data)
 *.db
 *.db-wal
 *.db-shm
-*.sqlite
-*.sqlite3
+*.zip
+backups/
+data_imports/
+backend/data/.jwt_secret
+backend/data/backups/
+backend/data/uploads/
+backend/data/*.db*
 
-# ML Checkpoints (keep exported ONNX models trackable if needed)
-*.pt
-*.pth
-!*.onnx
-
-# Frontend & E2E Build/Cache Artifacts
-node_modules/
-dist/
-.vite/
-*.tsbuildinfo
-playwright-report/
-test-results/
-
+# Keep trained Vision ONNX model, model card, and 6 public AITEX held-out samples tracked for cloud deployment
+!backend/data/vision/
+!backend/data/vision/winning_model.onnx
+!backend/data/vision/model_card.json
+!backend/data/vision/samples/
+!backend/data/vision/samples/*.png

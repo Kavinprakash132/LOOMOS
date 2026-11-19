@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { AlertTriangle, Camera, CheckCircle2, Cpu, Eye, Upload } from "lucide-react";
 import { apiRequest, formatDateTimeIST } from "../api/client";
+import { PageGuideBanner } from "../components/PageGuideBanner";
+import { TechnicalDetailsToggle } from "../components/TechnicalDetailsToggle";
 import { Beam, InspectionRecord, Loom, ModelCardResponse, Weaver } from "../types/api";
 
 const DEFECT_LABEL_OPTIONS = [
@@ -163,6 +165,14 @@ export function InspectPage() {
 
       {error && <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-sm">{error}</div>}
       {success && <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm">{success}</div>}
+
+      <PageGuideBanner
+        steps={[
+          "Take or upload a cloth photo (or tap a sample)",
+          "Check where the AI highlights possible defects",
+          "Confirm Defect or Clean Cloth to save",
+        ]}
+      />
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -463,12 +473,69 @@ export function InspectPage() {
         </div>
       )}
 
-      {/* Step 3: Reconciled Model Card & Recent Reviewed Photos */}
-      <div className="grid lg:grid-cols-2 gap-4">
-        {card && (
-          <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-2.5 overflow-x-auto">
-            <h2 className="text-sm font-bold">Reconciled AITEX Vision Model Card (1 Held-Out Split)</h2>
-            <p className="text-[11px] text-slate-600">{card.held_out_split_summary.imbalance_note}</p>
+      {/* Recent Reviewed Photos */}
+      <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-2.5">
+        <h2 className="text-sm font-bold">Recent Cloth Inspections ({inspections.length})</h2>
+        {inspections.length === 0 ? (
+          <div className="text-xs text-slate-500 py-4">No cloth photos checked yet. Upload a photo or click a reference sample above.</div>
+        ) : (
+          <div className="divide-y divide-slate-100 max-h-80 overflow-y-auto">
+            {inspections.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => {
+                  setActive(item);
+                  syncReviewDefaults(item);
+                }}
+                className="w-full text-left py-2 flex items-center justify-between gap-2.5 hover:bg-slate-50 px-1.5 rounded cursor-pointer"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <img
+                    src={item.heatmap_image_url ?? item.raw_image_url}
+                    alt={`Inspection ${item.id}`}
+                    className="w-10 h-10 rounded object-cover border border-slate-200 shrink-0"
+                  />
+                  <div className="min-w-0 text-xs">
+                    <div className="font-bold text-slate-800 truncate">
+                      #{item.id} · {item.reviewed_label ?? item.prediction?.predicted_label ?? "Pending"}
+                      {item.loom_number ? ` (${item.loom_number})` : ""}
+                    </div>
+                    <div className="text-[11px] text-slate-500 truncate">
+                      {formatDateTimeIST(item.inspected_at)}
+                      {Number(item.defective_metres) > 0 ? ` · Damaged ${item.defective_metres} m` : ""}
+                    </div>
+                  </div>
+                </div>
+                <span
+                  className={`px-2 py-0.5 rounded text-[10px] font-bold shrink-0 ${
+                    item.review_status === "CONFIRMED_DEFECT"
+                      ? "bg-rose-100 text-rose-800"
+                      : item.review_status === "CONFIRMED_CLEAN"
+                      ? "bg-emerald-100 text-emerald-800"
+                      : "bg-amber-100 text-amber-800"
+                  }`}
+                >
+                  {item.review_status === "CONFIRMED_DEFECT"
+                    ? "Defect"
+                    : item.review_status === "CONFIRMED_CLEAN"
+                    ? "Clean"
+                    : "Pending"}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Collapsible Thesis / Research AI Model Card */}
+      {card && (
+        <TechnicalDetailsToggle
+          title="Show AI Accuracy & Thesis Model Card (ResNet-18 vs MobileNetV3)"
+          subtitle="Held-out AITEX test comparison · Defect Recall, F1, Precision, ROC-AUC & CPU latency"
+        >
+          <p className="text-xs text-slate-600">{card.held_out_split_summary.imbalance_note}</p>
+          <div className="overflow-x-auto">
             <table className="w-full text-xs text-left">
               <thead className="border-b border-slate-200 text-slate-500">
                 <tr>
@@ -495,64 +562,14 @@ export function InspectPage() {
                 ))}
               </tbody>
             </table>
-            <div className="text-[11px] text-slate-500">
-              Strip split: {card.held_out_split_summary.train_strips} train / {card.held_out_split_summary.val_strips} val /{" "}
-              {card.held_out_split_summary.test_strips} held-out test ({card.held_out_split_summary.test_defect_patches} defect,{" "}
-              {card.held_out_split_summary.test_clean_patches} clean patches).
-            </div>
           </div>
-        )}
-
-        <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-2.5">
-          <h2 className="text-sm font-bold">Recent Cloth Inspections ({inspections.length})</h2>
-          {inspections.length === 0 ? (
-            <div className="text-xs text-slate-500 py-4">No cloth photos checked yet. Upload a photo or click a reference sample above.</div>
-          ) : (
-            <div className="divide-y divide-slate-100 max-h-80 overflow-y-auto">
-              {inspections.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => {
-                    setActive(item);
-                    syncReviewDefaults(item);
-                  }}
-                  className="w-full text-left py-2 flex items-center justify-between gap-2.5 hover:bg-slate-50 px-1.5 rounded cursor-pointer"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <img
-                      src={item.heatmap_image_url ?? item.raw_image_url}
-                      alt={`Inspection ${item.id}`}
-                      className="w-10 h-10 rounded object-cover border border-slate-200 shrink-0"
-                    />
-                    <div className="min-w-0 text-xs">
-                      <div className="font-bold text-slate-800 truncate">
-                        #{item.id} · {item.reviewed_label ?? item.prediction?.predicted_label ?? "Pending"}
-                        {item.loom_number ? ` (${item.loom_number})` : ""}
-                      </div>
-                      <div className="text-[11px] text-slate-500 truncate">
-                        {formatDateTimeIST(item.inspected_at)}
-                        {Number(item.defective_metres) > 0 ? ` · Damaged ${item.defective_metres} m` : ""}
-                      </div>
-                    </div>
-                  </div>
-                  <span
-                    className={`px-2 py-0.5 rounded text-[10px] font-bold shrink-0 ${
-                      item.review_status === "CONFIRMED_DEFECT"
-                        ? "bg-rose-100 text-rose-800"
-                        : item.review_status === "CONFIRMED_CLEAN"
-                        ? "bg-emerald-100 text-emerald-800"
-                        : "bg-amber-100 text-amber-800"
-                    }`}
-                  >
-                    {item.review_status}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
+          <div className="text-[11px] text-slate-500">
+            Strip split: {card.held_out_split_summary.train_strips} train / {card.held_out_split_summary.val_strips} val /{" "}
+            {card.held_out_split_summary.test_strips} held-out test ({card.held_out_split_summary.test_defect_patches} defect,{" "}
+            {card.held_out_split_summary.test_clean_patches} clean patches).
+          </div>
+        </TechnicalDetailsToggle>
+      )}
     </div>
   );
 }

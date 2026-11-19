@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { Activity, AlertTriangle, BarChart3, CheckCircle2, Gauge, IndianRupee, Layers } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Activity, AlertTriangle, BarChart3, Camera, CheckCircle2, ClipboardCheck, Gauge, IndianRupee, Layers, Truck, Zap } from "lucide-react";
 import { apiRequest, formatDateDMY, formatHoursFromMins, formatRupeesFromPaise, localIsoDate, offsetLocalIsoDate } from "../api/client";
+import { PageGuideBanner } from "../components/PageGuideBanner";
 import { useAuth } from "../context/AuthContext";
 import { FloorDashboard, OwnerDashboard } from "../types/api";
 
@@ -108,6 +110,52 @@ export function DashboardPage() {
       </div>
 
       {error && <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-sm">{error}</div>}
+
+      <PageGuideBanner
+        tip="Start here each day to check cloth woven, open alerts, and shed profit. Use the quick buttons below to jump straight to daily work."
+      />
+
+      {/* Quick Actions Strip */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
+        <Link
+          to="/today"
+          className="flex items-center gap-2.5 p-3 rounded-xl bg-amber-500 text-slate-950 font-bold text-sm hover:bg-amber-400 transition shadow-sm"
+        >
+          <ClipboardCheck className="w-4 h-4 shrink-0" />
+          <span>+ Log Today's Shift</span>
+        </Link>
+        <Link
+          to="/analytics?tab=eb"
+          className="flex items-center gap-2.5 p-3 rounded-xl bg-white border border-slate-200 text-slate-800 font-semibold text-sm hover:border-amber-400 hover:bg-amber-50/40 transition"
+        >
+          <Zap className="w-4 h-4 text-amber-600 shrink-0" />
+          <span>EB Bill Calculator</span>
+        </Link>
+        {isOwner ? (
+          <Link
+            to="/deliveries"
+            className="flex items-center gap-2.5 p-3 rounded-xl bg-white border border-slate-200 text-slate-800 font-semibold text-sm hover:border-amber-400 hover:bg-amber-50/40 transition"
+          >
+            <Truck className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>+ Delivery / EB Bill</span>
+          </Link>
+        ) : (
+          <Link
+            to="/beams"
+            className="flex items-center gap-2.5 p-3 rounded-xl bg-white border border-slate-200 text-slate-800 font-semibold text-sm hover:border-amber-400 hover:bg-amber-50/40 transition"
+          >
+            <Layers className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>Beams &amp; Yarn</span>
+          </Link>
+        )}
+        <Link
+          to="/inspect"
+          className="flex items-center gap-2.5 p-3 rounded-xl bg-white border border-slate-200 text-slate-800 font-semibold text-sm hover:border-amber-400 hover:bg-amber-50/40 transition"
+        >
+          <Camera className="w-4 h-4 text-indigo-600 shrink-0" />
+          <span>Check Cloth Photo</span>
+        </Link>
+      </div>
 
       {data && (
         <>

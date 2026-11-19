@@ -35,23 +35,23 @@ DEFAULT_STOP_REASONS = [
 
 
 def seed_default_tariff_and_stops(db: Session, owner_id: int) -> EbTariffPlan:
-    """Create the editable TANGEDCO LA3A2 preset and standard stop reasons."""
+    """Create the editable TNPDCL LA3A2 (2024-2026 live powerloom) preset and standard stop reasons."""
     plan = EbTariffPlan(
-        name="TANGEDCO LA3A2 (Powerloom LT-IIIA2 Preset)",
+        name="TNPDCL LA3A2 (Powerloom LT-IIIA2 Live Preset)",
         billing_cycle_days=60,
         overhead_per_kw_paise=0,
-        fixed_charge_per_kw_month_paise=0,
-        electricity_tax_bps=500,
+        fixed_charge_per_kw_month_paise=5350,  # Rs 53.50/kW/month = Rs 107/kW bi-monthly (Rs 1,070 for 10 kW)
+        electricity_tax_bps=500,  # 5% E-Tax on (CC + Fixed/RDFC)
         fppca_paise_per_unit=0,
-        tax_on_gross=False,
-        effective_from=date(2025, 1, 1),
-        notes="Editable preset: 0-1000 free, 1001-1500 @ Rs 4.15, >1500 @ Rs 5.30, 5% E-Tax (edit Fixed/FPPCA from bill).",
+        tax_on_gross=True,
+        effective_from=date(2024, 7, 1),
+        notes="Live TNPDCL LA3A2 preset: 0-1000 free (fixed & tax waived), 1001-1500 @ Rs 4.45, >1500 @ Rs 5.65, Fixed Rs 107/kW bi-monthly, 5% E-Tax.",
         created_by=owner_id,
     )
     plan.slabs = [
         EbTariffSlab(min_unit=0, max_unit=1000, rate_paise_per_unit=0),
-        EbTariffSlab(min_unit=1001, max_unit=1500, rate_paise_per_unit=415),
-        EbTariffSlab(min_unit=1501, max_unit=None, rate_paise_per_unit=530),
+        EbTariffSlab(min_unit=1001, max_unit=1500, rate_paise_per_unit=445),
+        EbTariffSlab(min_unit=1501, max_unit=None, rate_paise_per_unit=565),
     ]
     db.add(plan)
     db.flush()

@@ -9,6 +9,7 @@ import {
   offsetLocalIsoDate,
 } from "../api/client";
 import { ConfirmVoidModal } from "../components/ConfirmVoidModal";
+import { PageGuideBanner } from "../components/PageGuideBanner";
 import {
   AdvanceRecord,
   PayslipLinePreview,
@@ -218,6 +219,14 @@ export function PayrollPage() {
 
       {error && <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-sm no-print">{error}</div>}
       {success && <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm no-print">{success}</div>}
+
+      <PageGuideBanner
+        steps={[
+          "Check auto-calculated 7-day wages (adjust Damage Cut if needed)",
+          "Record any Worker Advances (Uthaav)",
+          "Finalize & print English / தமிழ் / हिन्दी payslips",
+        ]}
+      />
 
       <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-2 no-print">
         {[
