@@ -231,7 +231,7 @@ echo "  SSH Password   : ${ADMIN_PASS}"
 echo "  LOOMOS Mode    : ${MODE}"
 if [ "${MODE}" = "demo" ]; then
   echo "  Demo Owner     : welcome123 / welcome123"
-  echo "  Demo Supervisor: sup_siva / supPassword1"
+  echo "  Demo Supervisor: welcome@123 / welcome@123"
 fi
 echo "================================================================"
 echo ""

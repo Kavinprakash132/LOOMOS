@@ -74,7 +74,7 @@ fi
 echo "  MODE: ${MODE}  |  Persistent DB: ${DATA_DIR}/loomos.db"
 if [ "${MODE}" = "demo" ]; then
   echo "  Demo Owner Login:      welcome123 / welcome123"
-  echo "  Demo Supervisor Login: sup_siva / supPassword1"
+  echo "  Demo Supervisor Login: welcome@123 / welcome@123"
 else
   echo "  First-time real shed setup: open URL to run 3-step /setup wizard!"
 fi

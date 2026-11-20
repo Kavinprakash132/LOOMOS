@@ -68,7 +68,7 @@ echo "  DEMO MODE ACTIVE (loomos_demo.db)"
 echo "  Frontend Dev URL : http://127.0.0.1:5173"
 echo "  Backend API URL  : http://127.0.0.1:8000"
 echo "  Demo Owner       : welcome123 / welcome123"
-echo "  Demo Supervisor  : sup_siva  / supPassword1"
+echo "  Demo Supervisor  : welcome@123  / welcome@123"
 echo ""
 
 wait -n "${BACKEND_PID}" "${FRONTEND_PID}"

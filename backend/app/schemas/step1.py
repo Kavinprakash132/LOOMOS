@@ -57,7 +57,7 @@ class SetupInitializeRequest(BaseModel):
 
     # Step 1: Claim Your Shed (Security & Ownership first)
     owner_full_name: str = Field(min_length=2, max_length=100)
-    owner_username: str = Field(min_length=3, max_length=50, pattern=r"^[a-zA-Z0-9_.-]+$")
+    owner_username: str = Field(min_length=3, max_length=50, pattern=r"^[a-zA-Z0-9_.@-]+$")
     owner_password: str = Field(min_length=6, max_length=128)
     unit_name: str = Field(min_length=2, max_length=120)
     location: str = Field(default="", max_length=120)
@@ -108,7 +108,7 @@ class AuthTokenResponse(BaseModel):
 
 class UserCreateRequest(BaseModel):
     full_name: str = Field(min_length=2, max_length=100)
-    username: str = Field(min_length=3, max_length=50, pattern=r"^[a-zA-Z0-9_.-]+$")
+    username: str = Field(min_length=3, max_length=50, pattern=r"^[a-zA-Z0-9_.@-]+$")
     password: str = Field(min_length=6, max_length=128)
     role: UserRole = "SUPERVISOR"
     preferred_lang: LangCode = "en"

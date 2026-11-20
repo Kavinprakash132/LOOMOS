@@ -116,8 +116,8 @@ def populate_demo_shed(db_path: Path) -> dict[str, str | int]:
         )
         sup = User(
             full_name="Siva M (Demo Supervisor)",
-            username="sup_siva",
-            password_hash=hash_password("supPassword1"),
+            username="welcome@123",
+            password_hash=hash_password("welcome@123"),
             role="SUPERVISOR",
             preferred_lang="en",
             is_active=True,
@@ -598,7 +598,7 @@ def populate_demo_shed(db_path: Path) -> dict[str, str | int]:
         db.commit()
 
     engine.dispose()
-    return {"db_path": str(db_path), "looms": 5, "owner_username": "welcome123", "supervisor_username": "sup_siva"}
+    return {"db_path": str(db_path), "looms": 5, "owner_username": "welcome123", "supervisor_username": "welcome@123"}
 
 
 def main() -> None:
@@ -621,7 +621,7 @@ def main() -> None:
 
     if args.demo:
         res = populate_demo_shed(target)
-        print(f"[DEMO SEEDED] {res['db_path']} | Owner: welcome123 / welcome123 | Supervisor: sup_siva / supPassword1")
+        print(f"[DEMO SEEDED] {res['db_path']} | Owner: welcome123 / welcome123 | Supervisor: welcome@123 / welcome@123")
     elif args.clean:
         _reset_sqlite_file(target)
         print(f"[DEMO CLEAN RESET] {target} reset to empty uninitialized schema (setup wizard ready). Real loomos.db untouched.")
