@@ -1,14 +1,8 @@
 import React, { useState } from "react";
 import { apiRequest, formatDateDMY, formatRupeesFromPaise, localIsoDate } from "../../api/client";
 import { ConfirmVoidModal } from "../ConfirmVoidModal";
+import { useAuth } from "../../context/AuthContext";
 import { SlipLangCode, WageMode, Weaver, WeaverRoleType } from "../../types/api";
-
-const ROLE_LABELS: Record<WeaverRoleType, string> = {
-  WEAVER: "Weaver",
-  PIRN_WINDER: "Pirn Winder",
-  HELPER: "Helper",
-  FITTER: "Loom Fitter",
-};
 
 export function WeaversTab({
   weavers,
@@ -19,6 +13,14 @@ export function WeaversTab({
   onRefresh: () => Promise<void>;
   onError: (msg: string) => void;
 }) {
+  const { t, tr } = useAuth();
+  const roleLabel = (role: WeaverRoleType) => {
+    if (role === "WEAVER") return tr("Weaver", "நெசவாளர்");
+    if (role === "PIRN_WINDER") return tr("Pirn Winder", "கோன் சுற்றுபவர்");
+    if (role === "HELPER") return tr("Helper", "உதவியாளர்");
+    if (role === "FITTER") return tr("Loom Fitter", "தறி ஃபிட்டர்");
+    return role;
+  };
   const [fullName, setFullName] = useState("");
   const [slipLang, setSlipLang] = useState<SlipLangCode>("ta");
   const [roleType, setRoleType] = useState<WeaverRoleType>("WEAVER");
@@ -35,6 +37,11 @@ export function WeaversTab({
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    const initPaise = Math.round(parseFloat(rateRupees) * 100);
+    if (!Number.isFinite(initPaise) || initPaise <= 0) {
+      onError(tr("Enter a valid positive wage rate.", "சரியான கூலி விகிதத்தை உள்ளிடவும்."));
+      return;
+    }
     try {
       await apiRequest("/weavers", {
         method: "POST",
@@ -44,7 +51,7 @@ export function WeaversTab({
           role_type: roleType,
           phone,
           wage_mode: wageMode,
-          rate_paise: Math.round(parseFloat(rateRupees) * 100),
+          rate_paise: initPaise,
           effective_from: effDate,
         }),
       });
@@ -52,18 +59,23 @@ export function WeaversTab({
       setPhone("");
       await onRefresh();
     } catch (err) {
-      onError(err instanceof Error ? err.message : "Failed to create worker");
+      onError(err instanceof Error ? err.message : tr("Failed to create worker", "தொழிலாளியை சேர்க்க முடியவில்லை"));
     }
   };
 
   const handleReviseRate = async (e: React.FormEvent, weaverId: number) => {
     e.preventDefault();
+    const revPaise = Math.round(parseFloat(revRate) * 100);
+    if (!Number.isFinite(revPaise) || revPaise <= 0) {
+      onError(tr("Enter a valid positive wage rate.", "சரியான கூலி விகிதத்தை உள்ளிடவும்."));
+      return;
+    }
     try {
       await apiRequest(`/weavers/${weaverId}/wage-rules`, {
         method: "POST",
         body: JSON.stringify({
           wage_mode: revMode,
-          rate_paise: Math.round(parseFloat(revRate) * 100),
+          rate_paise: revPaise,
           effective_from: revDate,
         }),
       });
@@ -93,19 +105,22 @@ export function WeaversTab({
     <div className="space-y-4">
       <ConfirmVoidModal
         open={voidRuleId !== null}
-        title="Remove Wage Rule?"
-        description="Removes this wage rule from future calculations while keeping past wage slip records safe."
-        confirmLabel="Remove Rule"
+        title={tr("Remove Wage Rule?", "கூலி விதியை நீக்கவா?")}
+        description={tr(
+          "Removes this wage rule from future calculations while keeping past wage slip records safe.",
+          "எதிர்கால கணக்கீடுகளில் இந்த விதி நீக்கப்படும்; பழைய ரசீதுகள் பாதுகாப்பாக இருக்கும்."
+        )}
+        confirmLabel={tr("Remove Rule", "விதியை நீக்கு")}
         onCancel={() => setVoidRuleId(null)}
         onConfirm={confirmRemoveRule}
       />
 
       <form onSubmit={handleCreate} className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
-        <h3 className="text-sm font-bold">Add Worker (Weaver / Pirn Winder / Helper)</h3>
+        <h3 className="text-sm font-bold">{tr("Add Worker (Weaver / Pirn Winder / Helper)", "தொழிலாளர் சேர் (நெசவாளர் / உதவியாளர்)")}</h3>
         <div className="grid sm:grid-cols-3 gap-2.5">
           <div>
             <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-              Worker Name <span className="text-rose-600">*</span>
+              {tr("Worker Name", "பெயர்")} <span className="text-rose-600">*</span>
             </label>
             <input
               required
@@ -116,19 +131,19 @@ export function WeaversTab({
             />
           </div>
           <div>
-            <label className="block text-[11px] font-semibold text-slate-600 mb-1">Worker Type</label>
+            <label className="block text-[11px] font-semibold text-slate-600 mb-1">{tr("Worker Type", "பணி வகை")}</label>
             <select
               value={roleType}
               onChange={(e) => setRoleType(e.target.value as WeaverRoleType)}
               className="w-full px-3 py-2 rounded border border-slate-300 text-sm bg-white"
             >
-              <option value="WEAVER">Weaver</option>
-              <option value="PIRN_WINDER">Pirn Winder</option>
-              <option value="HELPER">Helper</option>
+              <option value="WEAVER">{tr("Weaver", "நெசவாளர்")}</option>
+              <option value="PIRN_WINDER">{tr("Pirn Winder", "கோன் சுற்றுபவர்")}</option>
+              <option value="HELPER">{tr("Helper", "உதவியாளர்")}</option>
             </select>
           </div>
           <div>
-            <label className="block text-[11px] font-semibold text-slate-600 mb-1">Payslip Print Language</label>
+            <label className="block text-[11px] font-semibold text-slate-600 mb-1">{tr("Payslip Print Language", "ரசீது மொழி")}</label>
             <select
               value={slipLang}
               onChange={(e) => setSlipLang(e.target.value as SlipLangCode)}
@@ -142,21 +157,21 @@ export function WeaversTab({
         </div>
         <div className="grid sm:grid-cols-4 gap-2.5">
           <div>
-            <label className="block text-[11px] font-semibold text-slate-600 mb-1">Wage Calculation Mode</label>
+            <label className="block text-[11px] font-semibold text-slate-600 mb-1">{tr("Wage Calculation Mode", "கூலி முறை")}</label>
             <select
               value={wageMode}
               onChange={(e) => setWageMode(e.target.value as WageMode)}
               className="w-full px-3 py-2 rounded border border-slate-300 text-sm bg-white"
             >
-              <option value="PER_LOOM_SHIFT">Per Loom-Shift (₹)</option>
-              <option value="PER_METRE">Per Metre (₹/m)</option>
-              <option value="PER_SHIFT_ATTENDANCE">Per Shift Attended (₹)</option>
-              <option value="FIXED_WEEKLY">Fixed Weekly Pay (₹)</option>
+              <option value="PER_LOOM_SHIFT">{t("wage_PER_LOOM_SHIFT")}</option>
+              <option value="PER_METRE">{t("wage_PER_METRE")}</option>
+              <option value="PER_SHIFT_ATTENDANCE">{t("wage_PER_SHIFT_ATTENDANCE")}</option>
+              <option value="FIXED_WEEKLY">{t("wage_FIXED_WEEKLY")}</option>
             </select>
           </div>
           <div>
             <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-              Pay Rate (₹) <span className="text-rose-600">*</span>
+              {tr("Pay Rate (₹)", "கூலி விகிதம் (₹)")} <span className="text-rose-600">*</span>
             </label>
             <input
               type="number"
@@ -170,7 +185,7 @@ export function WeaversTab({
             />
           </div>
           <div>
-            <label className="block text-[11px] font-semibold text-slate-600 mb-1">Effective From Date</label>
+            <label className="block text-[11px] font-semibold text-slate-600 mb-1">{tr("Effective From Date", "அமல் தேதி")}</label>
             <input
               type="date"
               value={effDate}
@@ -179,7 +194,7 @@ export function WeaversTab({
             />
           </div>
           <div>
-            <label className="block text-[11px] font-semibold text-slate-600 mb-1">Phone Number (optional)</label>
+            <label className="block text-[11px] font-semibold text-slate-600 mb-1">{tr("Phone Number (optional)", "தொலைபேசி (விருப்பம்)")}</label>
             <input
               placeholder="e.g. 9894011111"
               value={phone}
@@ -189,7 +204,7 @@ export function WeaversTab({
           </div>
         </div>
         <button type="submit" className="px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold">
-          Add Worker
+          {tr("Add Worker", "தொழிலாளர் சேர்")}
         </button>
       </form>
 
@@ -200,10 +215,10 @@ export function WeaversTab({
               <div>
                 <span className="font-bold text-slate-900">{w.full_name}</span>
                 <span className="ml-2 px-2 py-0.5 rounded bg-slate-100 text-[11px] font-semibold">
-                  {ROLE_LABELS[w.role_type] ?? w.role_type}
+                  {roleLabel(w.role_type)}
                 </span>
                 <span className="ml-1.5 px-2 py-0.5 rounded bg-amber-50 text-amber-800 text-[11px] font-semibold uppercase">
-                  Slip: {w.preferred_slip_lang}
+                  {tr("Slip", "ரசீது")}: {w.preferred_slip_lang}
                 </span>
               </div>
               <button
@@ -217,7 +232,7 @@ export function WeaversTab({
                 }}
                 className="text-xs font-semibold text-amber-700 hover:underline cursor-pointer"
               >
-                + Revise Rate (Dated)
+                {tr("+ Revise Rate (Dated)", "+ கூலி மாற்று")}
               </button>
             </div>
 
@@ -225,16 +240,16 @@ export function WeaversTab({
               {w.wage_rules.map((r) => (
                 <div key={r.id} className="flex items-center justify-between bg-slate-50 px-2.5 py-1.5 rounded">
                   <span>
-                    <b>{r.wage_mode}</b> · {formatRupeesFromPaise(r.rate_paise)} · From{" "}
+                    <b>{t(`wage_${r.wage_mode}`)}</b> · {formatRupeesFromPaise(r.rate_paise)} · {tr("From", "முதல்")}{" "}
                     {formatDateDMY(r.effective_from)}{" "}
-                    {r.effective_to ? `to ${formatDateDMY(r.effective_to)}` : "(Active)"}
+                    {r.effective_to ? `${tr("to", "வரை")} ${formatDateDMY(r.effective_to)}` : `(${tr("Active", "செயலில்")})`}
                   </span>
                   <button
                     type="button"
                     onClick={() => setVoidRuleId(r.id)}
                     className="text-rose-600 hover:underline cursor-pointer font-semibold"
                   >
-                    Remove
+                    {tr("Remove", "நீக்கு")}
                   </button>
                 </div>
               ))}
@@ -246,20 +261,20 @@ export function WeaversTab({
                 className="pt-2 border-t border-slate-200 grid sm:grid-cols-4 gap-2 items-end"
               >
                 <div>
-                  <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Wage Mode</label>
+                  <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">{tr("Wage Mode", "கூலி முறை")}</label>
                   <select
                     value={revMode}
                     onChange={(e) => setRevMode(e.target.value as WageMode)}
                     className="w-full px-2 py-1.5 rounded border border-slate-300 text-xs"
                   >
-                    <option value="PER_LOOM_SHIFT">Per Loom-Shift</option>
-                    <option value="PER_METRE">Per Metre</option>
-                    <option value="PER_SHIFT_ATTENDANCE">Per Shift Attended</option>
-                    <option value="FIXED_WEEKLY">Fixed Weekly</option>
+                    <option value="PER_LOOM_SHIFT">{t("wage_PER_LOOM_SHIFT")}</option>
+                    <option value="PER_METRE">{t("wage_PER_METRE")}</option>
+                    <option value="PER_SHIFT_ATTENDANCE">{t("wage_PER_SHIFT_ATTENDANCE")}</option>
+                    <option value="FIXED_WEEKLY">{t("wage_FIXED_WEEKLY")}</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">New Rate (₹)</label>
+                  <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">{tr("New Rate (₹)", "புதிய கூலி (₹)")}</label>
                   <input
                     type="number"
                     step="0.01"
@@ -271,7 +286,7 @@ export function WeaversTab({
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">Effective Date</label>
+                  <label className="block text-[10px] font-semibold text-slate-500 mb-0.5">{tr("Effective Date", "அமல் தேதி")}</label>
                   <input
                     type="date"
                     required
@@ -281,7 +296,7 @@ export function WeaversTab({
                   />
                 </div>
                 <button type="submit" className="px-3 py-1.5 rounded bg-slate-900 text-white text-xs font-semibold">
-                  Save New Rule
+                  {tr("Save New Rule", "சேமி")}
                 </button>
               </form>
             )}

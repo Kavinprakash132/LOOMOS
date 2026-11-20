@@ -2,18 +2,22 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+import hashlib
+import hmac
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse
+from fastapi.security import HTTPAuthorizationCredentials
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit
+from app.core.config import get_settings, today_ist
 from app.core.database import get_db
-from app.core.security import get_current_user
+from app.core.security import bearer_scheme, get_current_user
 from app.models.core import Beam, DefectPrediction, Inspection, Loom, ShiftEntry, User, Weaver
 from app.schemas.step3 import (
     DefectPredictionInfo,
@@ -31,6 +35,21 @@ from app.services.vision_service import (
 )
 
 router = APIRouter(prefix="/api/v1/inspections", tags=["inspections"])
+
+MAX_IMAGE_UPLOAD_BYTES = 15 * 1024 * 1024  # 15 MB safe cap
+
+
+def _sign_inspection_image(inspection_id: int, kind: str) -> str:
+    secret = get_settings().resolved_secret_key().encode("utf-8")
+    msg = f"insp:{inspection_id}:{kind}".encode("utf-8")
+    return hmac.new(secret, msg, hashlib.sha256).hexdigest()[:32]
+
+
+def _verify_inspection_image_sig(inspection_id: int, kind: str, sig: str | None) -> bool:
+    if not sig:
+        return False
+    expected = _sign_inspection_image(inspection_id, kind)
+    return hmac.compare_digest(sig, expected)
 
 
 def _serialize_inspection(
@@ -72,8 +91,12 @@ def _serialize_inspection(
         weaver_id=insp.weaver_id,
         weaver_name=weaver.full_name if weaver else None,
         shift_entry_id=insp.shift_entry_id,
-        raw_image_url=f"/api/v1/inspections/{insp.id}/image/raw",
-        heatmap_image_url=f"/api/v1/inspections/{insp.id}/image/heatmap" if insp.heatmap_path else None,
+        raw_image_url=f"/api/v1/inspections/{insp.id}/image/raw?sig={_sign_inspection_image(insp.id, 'raw')}",
+        heatmap_image_url=(
+            f"/api/v1/inspections/{insp.id}/image/heatmap?sig={_sign_inspection_image(insp.id, 'heatmap')}"
+            if insp.heatmap_path
+            else None
+        ),
         review_status=insp.review_status,  # type: ignore[arg-type]
         reviewed_label=insp.reviewed_label,
         defective_metres=insp.defective_metres,
@@ -132,9 +155,14 @@ async def analyze_fabric_photo(
     """Run ONNX Two-Output inference + Grad-CAM overlay on uploaded cloth photo or held-out AITEX sample."""
     is_ref = False
     if file is not None:
-        raw_bytes = await file.read()
+        raw_bytes = await file.read(MAX_IMAGE_UPLOAD_BYTES + 1)
         if not raw_bytes:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Uploaded image file is empty")
+        if len(raw_bytes) > MAX_IMAGE_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                detail="Uploaded image is too large (max 15 MB allowed)",
+            )
     elif sample_id:
         sample = get_sample_metadata(sample_id)
         if not sample:
@@ -251,7 +279,7 @@ def review_inspection(
         and insp.defective_metres > Decimal("0.00")
         and insp.loom_id is not None
     ):
-        today = date.today()
+        today = today_ist()
         shift_row = db.scalar(
             select(ShiftEntry)
             .where(
@@ -327,18 +355,24 @@ def list_inspections(
 def get_inspection_image(
     inspection_id: int,
     kind: str,
-    db: Annotated[Session, Depends(get_db)],
+    sig: str | None = Query(default=None),
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)] = None,
+    db: Annotated[Session, Depends(get_db)] = None,  # type: ignore[assignment]
 ) -> FileResponse:
-    """Serve stored raw cloth image or Grad-CAM heatmap overlay PNG."""
+    """Serve stored raw cloth image or Grad-CAM heatmap overlay PNG (requires HMAC sig or Bearer JWT)."""
     if kind not in {"raw", "heatmap"}:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="kind must be 'raw' or 'heatmap'")
+    if not _verify_inspection_image_sig(inspection_id, kind, sig):
+        # Fallback: allow direct Bearer JWT auth if no valid HMAC signature was supplied
+        get_current_user(credentials, db)
     insp = db.get(Inspection, inspection_id)
     if not insp:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Inspection not found")
     fname = insp.image_path if kind == "raw" else insp.heatmap_path
     if not fname:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Requested image unavailable")
-    path = get_inspections_storage_dir() / fname
-    if not path.exists():
+    storage_dir = get_inspections_storage_dir().resolve()
+    path = (storage_dir / fname).resolve()
+    if storage_dir not in path.parents or not path.exists():
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Image file missing on disk")
-    return FileResponse(path, media_type="image/png")
+    return FileResponse(path, media_type="image/png", headers={"Cache-Control": "private, max-age=3600"})

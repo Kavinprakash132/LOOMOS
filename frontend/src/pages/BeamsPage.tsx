@@ -3,9 +3,11 @@ import { AlertTriangle, ArrowRightLeft, Layers, PackagePlus, Plus, Trash2, Unplu
 import { apiRequest, formatDateDMY, localIsoDate } from "../api/client";
 import { ConfirmVoidModal } from "../components/ConfirmVoidModal";
 import { PageGuideBanner } from "../components/PageGuideBanner";
+import { useAuth } from "../context/AuthContext";
 import { Beam, FabricSort, Loom, Trader, UnloadReason, WeftReceipt } from "../types/api";
 
 export function BeamsPage() {
+  const { tr } = useAuth();
   const [beams, setBeams] = useState<Beam[]>([]);
   const [receipts, setReceipts] = useState<WeftReceipt[]>([]);
   const [traders, setTraders] = useState<Trader[]>([]);
@@ -43,6 +45,7 @@ export function BeamsPage() {
   const [actualWasteM, setActualWasteM] = useState("");
   const [voidWeftTarget, setVoidWeftTarget] = useState<{ id: number; label: string } | null>(null);
   const [openDrawer, setOpenDrawer] = useState<"none" | "beam" | "weft">("none");
+  const [submitting, setSubmitting] = useState(false);
 
   const loadData = useCallback(async () => {
     setError(null);
@@ -80,6 +83,8 @@ export function BeamsPage() {
 
   const handleCreateBeam = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
+    setSubmitting(true);
     setError(null);
     setSuccess(null);
     try {
@@ -98,15 +103,19 @@ export function BeamsPage() {
       });
       setBeamNo("");
       setOpeningWoven("0");
-      setSuccess("Warp beam added.");
+      setSuccess(tr("Warp beam added.", "பீம் சேர்க்கப்பட்டது."));
       await loadData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not add beam");
+      setError(err instanceof Error ? err.message : tr("Could not add beam", "பீமை சேர்க்க முடியவில்லை"));
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleCreateWeft = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
+    setSubmitting(true);
     setError(null);
     setSuccess(null);
     try {
@@ -121,15 +130,18 @@ export function BeamsPage() {
         }),
       });
       setWeftNote("");
-      setSuccess("Weft yarn receipt recorded and wastage rechecked.");
+      setSuccess(tr("Weft yarn receipt recorded and wastage rechecked.", "ஊடு நூல் வரவு சேமிக்கப்பட்டு கழிவு சரிபார்க்கப்பட்டது."));
       await loadData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not save weft receipt");
+      setError(err instanceof Error ? err.message : tr("Could not save weft receipt", "நூல் வரவை சேமிக்க முடியவில்லை"));
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleMount = async (beamId: number) => {
-    if (!mountLoomId) return;
+    if (!mountLoomId || submitting) return;
+    setSubmitting(true);
     setError(null);
     try {
       await apiRequest(`/beams/${beamId}/load`, {
@@ -137,14 +149,18 @@ export function BeamsPage() {
         body: JSON.stringify({ loom_id: mountLoomId }),
       });
       setMountBeamId(null);
-      setSuccess("Beam mounted on loom.");
+      setSuccess(tr("Beam mounted on loom.", "தறியில் பீம் ஏற்றப்பட்டது."));
       await loadData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to mount beam");
+      setError(err instanceof Error ? err.message : tr("Failed to mount beam", "பீம் ஏற்ற முடியவில்லை"));
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleUnload = async (beamId: number) => {
+    if (submitting) return;
+    setSubmitting(true);
     setError(null);
     try {
       await apiRequest(`/beams/${beamId}/unload`, {
@@ -156,10 +172,12 @@ export function BeamsPage() {
         }),
       });
       setUnloadBeamId(null);
-      setSuccess("Beam unloaded and weft wastage reconciled.");
+      setSuccess(tr("Beam unloaded and weft wastage reconciled.", "பீம் இறக்கப்பட்டு நூல் கழிவு கணக்கிடப்பட்டது."));
       await loadData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to unload beam");
+      setError(err instanceof Error ? err.message : tr("Failed to unload beam", "பீம் இறக்க முடியவில்லை"));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -184,13 +202,24 @@ export function BeamsPage() {
   const visibleBeams = statusFilter === "ALL" ? beams : beams.filter((b) => b.status === statusFilter);
   const beamNoById = new Map(beams.map((b) => [b.id, b.beam_no]));
 
+  const statusLabel = (st: string) => {
+    if (st === "ALL") return tr("ALL", "அனைத்தும்");
+    if (st === "RUNNING") return tr("RUNNING", "ஓடுகிறது");
+    if (st === "IN_STOCK") return tr("IN STOCK", "இருப்பில்");
+    if (st === "COMPLETED") return tr("COMPLETED", "முடிந்தது");
+    return st;
+  };
+
   return (
     <div className="space-y-6">
       <ConfirmVoidModal
         open={Boolean(voidWeftTarget)}
-        title={`Void ${voidWeftTarget?.label ?? ""}?`}
-        description="Removes this weft yarn receipt and recalculates wastage while keeping a Change History entry."
-        confirmLabel="Confirm Void"
+        title={tr(`Void ${voidWeftTarget?.label ?? ""}?`, `${voidWeftTarget?.label ?? ""} பதிவை நீக்கவா?`)}
+        description={tr(
+          "Removes this weft yarn receipt and recalculates wastage while keeping a Change History entry.",
+          "இந்த ஊடை நூல் பதிவை நீக்கி வீண் கணக்கை மீண்டும் கணக்கிடும்; மாற்றப் பதிவில் வரலாறு இருக்கும்."
+        )}
+        confirmLabel={tr("Confirm Void", "நீக்குதலை உறுதி செய்")}
         onCancel={() => setVoidWeftTarget(null)}
         onConfirm={handleVoidWeft}
       />
@@ -198,10 +227,13 @@ export function BeamsPage() {
         <div>
           <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
             <Layers className="w-5 h-5 text-amber-600" />
-            Warp Beams, Loom Loading & Weft Yarn Wastage
+            {tr("Warp Beams, Loom Loading & Weft Yarn Wastage", "பாவு பீம்கள், தறி ஏற்றம் & ஊடை நூல் வீண் கணக்கு")}
           </h1>
           <p className="text-xs text-slate-500">
-            Warp Beam = main lengthwise yarn roll loaded onto a loom; Weft = cross-yarn cones woven across it. Tracks remaining cloth length &amp; yarn wastage.
+            {tr(
+              "Warp Beam = main lengthwise yarn roll loaded onto a loom; Weft = cross-yarn cones woven across it. Tracks remaining cloth length & yarn wastage.",
+              "பாவு பீம் = தறியில் ஏற்றும் நீள நூல் உருளை; ஊடை = குறுக்கு நூல் கோன்கள். மீதி துணி நீளம் மற்றும் நூல் வீணை கண்காணிக்கும்."
+            )}
           </p>
         </div>
         <div className="flex gap-1.5 text-xs font-semibold">
@@ -214,7 +246,7 @@ export function BeamsPage() {
                 statusFilter === st ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-700 border-slate-300"
               }`}
             >
-              {st}
+              {statusLabel(st)}
             </button>
           ))}
         </div>
@@ -225,10 +257,10 @@ export function BeamsPage() {
 
       <PageGuideBanner
         steps={[
-          "Receive Warp Beam from Trader",
-          "Load Beam onto a Free Loom",
-          "Issue Weft Cones as Needed",
-          "Unload Empty Beam to Check Yarn Waste",
+          tr("Receive Warp Beam from Trader", "வியாபாரியிடம் பீம் வரவு பதிவு"),
+          tr("Load Beam onto a Free Loom", "காலி தறியில் பீம் ஏற்றவும்"),
+          tr("Issue Weft Cones as Needed", "தேவைக்கேற்ப ஊடை நூல் வழங்கவும்"),
+          tr("Unload Empty Beam to Check Yarn Waste", "பீம் முடிந்ததும் இறக்கி வீணை சரிபார்க்கவும்"),
         ]}
       />
 
@@ -244,7 +276,9 @@ export function BeamsPage() {
           }`}
         >
           <Plus className="w-4 h-4" />
-          {openDrawer === "beam" ? "Close Warp Beam Form" : "Receive New Warp Beam"}
+          {openDrawer === "beam"
+            ? tr("Close Warp Beam Form", "பீம் படிவத்தை மூடு")
+            : tr("Receive New Warp Beam", "புதிய பாவு பீம் வரவு")}
         </button>
         <button
           type="button"
@@ -256,26 +290,28 @@ export function BeamsPage() {
           }`}
         >
           <Plus className="w-4 h-4" />
-          {openDrawer === "weft" ? "Close Weft Form" : "Issue Weft Yarn Cones"}
+          {openDrawer === "weft"
+            ? tr("Close Weft Form", "ஊடை படிவத்தை மூடு")
+            : tr("Issue Weft Yarn Cones", "ஊடை நூல் கோன் வழங்கல்")}
         </button>
       </div>
 
       {/* Summary Strip */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="bg-white p-3.5 rounded-xl border border-slate-200">
-          <div className="text-xs text-slate-500">Active Warp Beams (On Looms)</div>
+          <div className="text-xs text-slate-500">{tr("Active Warp Beams (On Looms)", "தறியில் ஓடும் பீம்கள்")}</div>
           <div className="text-xl font-bold">{beams.filter((b) => b.status === "RUNNING").length}</div>
         </div>
         <div className="bg-white p-3.5 rounded-xl border border-slate-200">
-          <div className="text-xs text-slate-500">In Stock</div>
+          <div className="text-xs text-slate-500">{tr("In Stock", "இருப்பில்")}</div>
           <div className="text-xl font-bold">{beams.filter((b) => b.status === "IN_STOCK").length}</div>
         </div>
         <div className="bg-white p-3.5 rounded-xl border border-slate-200">
-          <div className="text-xs text-slate-500">Free Operational Looms</div>
+          <div className="text-xs text-slate-500">{tr("Free Operational Looms", "காலியான தறிகள்")}</div>
           <div className="text-xl font-bold">{freeLooms.length}</div>
         </div>
         <div className="bg-white p-3.5 rounded-xl border border-slate-200">
-          <div className="text-xs text-slate-500">Wastage Alerts</div>
+          <div className="text-xs text-slate-500">{tr("Wastage Alerts", "வீண் எச்சரிக்கைகள்")}</div>
           <div className="text-xl font-bold text-rose-600">{beams.filter((b) => b.wastage_flagged).length}</div>
         </div>
       </div>
@@ -287,11 +323,11 @@ export function BeamsPage() {
         <form onSubmit={handleCreateBeam} className="bg-white p-4 rounded-xl border border-amber-300 shadow-sm space-y-3">
           <h2 className="text-sm font-bold flex items-center gap-1.5">
             <PackagePlus className="w-4 h-4 text-amber-600" />
-            Receive New Warp Beam
+            {tr("Receive New Warp Beam", "புதிய பாவு பீம் வரவு")}
           </h2>
           <div className="grid sm:grid-cols-3 gap-2.5">
             <div>
-              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Beam Number *</label>
+              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Beam Number *", "பீம் எண் *")}</label>
               <input
                 required
                 placeholder="e.g. BM-106"
@@ -301,7 +337,7 @@ export function BeamsPage() {
               />
             </div>
             <div>
-              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Trader *</label>
+              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Trader *", "வியாபாரி *")}</label>
               <select
                 required
                 value={traderId}
@@ -316,7 +352,7 @@ export function BeamsPage() {
               </select>
             </div>
             <div>
-              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Fabric Sort *</label>
+              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Fabric Sort *", "துணி வகை *")}</label>
               <select
                 required
                 value={sortId}
@@ -333,7 +369,7 @@ export function BeamsPage() {
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-2 gap-2.5">
             <div>
-              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Received Date *</label>
+              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Received Date *", "பெற்ற தேதி *")}</label>
               <input
                 type="date"
                 required
@@ -343,7 +379,7 @@ export function BeamsPage() {
               />
             </div>
             <div>
-              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Warp Length (m) *</label>
+              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Warp Length (m) *", "பாவு நீளம் (மீ) *")}</label>
               <input
                 type="number"
                 step="0.01"
@@ -355,19 +391,19 @@ export function BeamsPage() {
               />
             </div>
             <div>
-              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Already Woven (m)</label>
+              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Already Woven (m)", "ஏற்கனவே நெய்தது (மீ)")}</label>
               <input
                 type="number"
                 step="0.01"
                 min="0"
                 value={openingWoven}
                 onChange={(e) => setOpeningWoven(e.target.value)}
-                title="For half-woven beams already on looms at Day-1 launch"
+                title={tr("For half-woven beams already on looms at Day-1 launch", "ஏற்கனவே பாதியளவு ஓடிய பீம்களுக்கு")}
                 className="w-full px-3 py-2 rounded border border-slate-300 text-sm"
               />
             </div>
             <div>
-              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Tail Waste (m)</label>
+              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Tail Waste (m)", "கடைசி வீண் (மீ)")}</label>
               <input
                 type="number"
                 step="0.01"
@@ -380,7 +416,7 @@ export function BeamsPage() {
           </div>
           <div className="flex flex-wrap items-end gap-2">
             <div>
-              <label className="text-[11px] text-slate-500 block">Target Due Date (optional)</label>
+              <label className="text-[11px] text-slate-500 block">{tr("Target Due Date (optional)", "முடிக்க வேண்டிய தேதி (விருப்பம்)")}</label>
               <input
                 type="date"
                 value={dueDate}
@@ -388,8 +424,8 @@ export function BeamsPage() {
                 className="px-2.5 py-1.5 rounded border border-slate-300 text-sm"
               />
             </div>
-            <button type="submit" className="px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold cursor-pointer">
-              Add Warp Beam
+            <button type="submit" disabled={submitting} className="px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold cursor-pointer disabled:opacity-50">
+              {tr("Add Warp Beam", "பீம் சேர்")}
             </button>
           </div>
         </form>
@@ -397,10 +433,10 @@ export function BeamsPage() {
 
         {openDrawer === "weft" && (
         <form onSubmit={handleCreateWeft} className="bg-white p-4 rounded-xl border border-amber-300 shadow-sm space-y-3">
-          <h2 className="text-sm font-bold">Issue Weft Yarn Bags / Cones to Beam</h2>
+          <h2 className="text-sm font-bold">{tr("Issue Weft Yarn Bags / Cones to Beam", "பீமுக்கு ஊடை நூல் மூட்டை / கோன் வழங்கல்")}</h2>
           <div className="grid sm:grid-cols-2 gap-2.5">
             <div>
-              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Target Warp Beam *</label>
+              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Target Warp Beam *", "பீம் *")}</label>
               <select
                 value={weftBeamId}
                 onChange={(e) => setWeftBeamId(Number(e.target.value))}
@@ -408,13 +444,13 @@ export function BeamsPage() {
               >
                 {beams.map((b) => (
                   <option key={b.id} value={b.id}>
-                    {b.beam_no} · {b.sort_name} ({b.status})
+                    {b.beam_no} · {b.sort_name} ({statusLabel(b.status)})
                   </option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Received Date *</label>
+              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Received Date *", "தேதி *")}</label>
               <input
                 type="date"
                 required
@@ -426,7 +462,7 @@ export function BeamsPage() {
           </div>
           <div className="grid sm:grid-cols-3 gap-2">
             <div>
-              <label className="text-[11px] text-slate-500 block">Bags</label>
+              <label className="text-[11px] text-slate-500 block">{tr("Bags", "மூட்டைகள்")}</label>
               <input
                 type="number"
                 min={1}
@@ -437,7 +473,7 @@ export function BeamsPage() {
               />
             </div>
             <div>
-              <label className="text-[11px] text-slate-500 block">Net Weight (kg)</label>
+              <label className="text-[11px] text-slate-500 block">{tr("Net Weight (kg)", "நிகர எடை (கிலோ)")}</label>
               <input
                 type="number"
                 step="0.001"
@@ -449,17 +485,17 @@ export function BeamsPage() {
               />
             </div>
             <div>
-              <label className="text-[11px] text-slate-500 block">Note (optional)</label>
+              <label className="text-[11px] text-slate-500 block">{tr("Note (optional)", "குறிப்பு (விருப்பம்)")}</label>
               <input
                 value={weftNote}
                 onChange={(e) => setWeftNote(e.target.value)}
-                placeholder="Lot / cone note"
+                placeholder={tr("Lot / cone note", "லாட் / கோன் குறிப்பு")}
                 className="w-full px-3 py-1.5 rounded border border-slate-300 text-sm"
               />
             </div>
           </div>
-          <button type="submit" className="px-4 py-2 rounded-lg bg-amber-600 text-white text-xs font-semibold cursor-pointer">
-            Save Weft Issue
+          <button type="submit" disabled={submitting} className="px-4 py-2 rounded-lg bg-amber-600 text-white text-xs font-semibold cursor-pointer disabled:opacity-50">
+            {tr("Save Weft Issue", "ஊடை பதிவை சேமி")}
           </button>
         </form>
         )}
@@ -483,17 +519,17 @@ export function BeamsPage() {
                         : "bg-blue-100 text-blue-800"
                     }`}
                   >
-                    {b.status}
-                    {b.active_loom_number ? ` on ${b.active_loom_number}` : ""}
+                    {statusLabel(b.status)}
+                    {b.active_loom_number ? ` · ${b.active_loom_number}` : ""}
                   </span>
                   {b.wastage_flagged && (
                     <span className="px-2 py-0.5 rounded bg-rose-100 text-rose-800 text-[11px] font-bold inline-flex items-center gap-1">
-                      <AlertTriangle className="w-3 h-3" /> Weft Waste {b.actual_wastage_pct}% &gt; {b.allowed_wastage_pct}%
+                      <AlertTriangle className="w-3 h-3" /> {tr("Weft Waste", "ஊடை வீண்")} {b.actual_wastage_pct}% &gt; {b.allowed_wastage_pct}%
                     </span>
                   )}
                   {b.due_date && (
                     <span className="px-2 py-0.5 rounded bg-amber-50 text-amber-800 text-[11px] font-medium">
-                      Due: {formatDateDMY(b.due_date)}
+                      {tr("Due", "இலக்கு")}: {formatDateDMY(b.due_date)}
                     </span>
                   )}
                   {b.status === "RUNNING" && etaMap[b.id] && (
@@ -502,12 +538,12 @@ export function BeamsPage() {
                         etaMap[b.id].on_track ? "bg-emerald-50 text-emerald-800" : "bg-rose-100 text-rose-800"
                       }`}
                     >
-                      ETA: {formatDateDMY(etaMap[b.id].eta_date_p50)} ({etaMap[b.id].on_track ? "On Track" : "Late"})
+                      ETA: {formatDateDMY(etaMap[b.id].eta_date_p50)} ({etaMap[b.id].on_track ? tr("On Track", "சரியான வேகம்") : tr("Late", "தாமதம்")})
                     </span>
                   )}
                 </div>
                 <div className="text-xs text-slate-500 mt-0.5">
-                  {b.trader_name} · {b.sort_name} · Received {formatDateDMY(b.received_date)}
+                  {b.trader_name} · {b.sort_name} · {tr("Received", "பெற்றது")} {formatDateDMY(b.received_date)}
                 </div>
               </div>
 
@@ -521,7 +557,7 @@ export function BeamsPage() {
                     }}
                     className="px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold inline-flex items-center gap-1"
                   >
-                    <ArrowRightLeft className="w-3.5 h-3.5" /> Load on Loom
+                    <ArrowRightLeft className="w-3.5 h-3.5" /> {tr("Load on Loom", "தறியில் ஏற்று")}
                   </button>
                 )}
                 {b.status === "RUNNING" && (
@@ -533,7 +569,7 @@ export function BeamsPage() {
                     }}
                     className="px-3 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-semibold inline-flex items-center gap-1"
                   >
-                    <Unplug className="w-3.5 h-3.5" /> Unload / Reconcile
+                    <Unplug className="w-3.5 h-3.5" /> {tr("Unload / Reconcile", "இறக்கு / கணக்கு முடி")}
                   </button>
                 )}
               </div>
@@ -543,10 +579,10 @@ export function BeamsPage() {
             <div className="space-y-1">
               <div className="flex justify-between text-xs text-slate-600">
                 <span>
-                  Woven: <b>{b.woven_m} m</b> / Usable {b.usable_total_m} m
+                  {tr("Woven", "நெய்தது")}: <b>{b.woven_m} m</b> / {tr("Usable", "மொத்தம்")} {b.usable_total_m} m
                 </span>
                 <span>
-                  Remaining: <b>{b.remaining_m} m</b> ({b.progress_pct}%)
+                  {tr("Remaining", "மீதி")}: <b>{b.remaining_m} m</b> ({b.progress_pct}%)
                 </span>
               </div>
               <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
@@ -556,13 +592,13 @@ export function BeamsPage() {
 
             {/* Weft metrics */}
             <div className="flex flex-wrap gap-4 text-xs text-slate-600 bg-slate-50 rounded-lg px-3 py-2">
-              <span>Weft Issued: <b>{b.weft_received_kg} kg</b></span>
-              <span>Returned: <b>{b.returned_weft_kg} kg</b></span>
-              <span>Net Used: <b>{b.weft_consumed_kg} kg</b></span>
-              <span>Expected for Woven Metres: <b>{b.expected_weft_kg} kg</b></span>
+              <span>{tr("Weft Issued", "ஊடை வழங்கியது")}: <b>{b.weft_received_kg} kg</b></span>
+              <span>{tr("Returned", "திருப்பியது")}: <b>{b.returned_weft_kg} kg</b></span>
+              <span>{tr("Net Used", "பயன்பாடு")}: <b>{b.weft_consumed_kg} kg</b></span>
+              <span>{tr("Expected for Woven Metres", "தேவையான எடை")}: <b>{b.expected_weft_kg} kg</b></span>
               {b.actual_wastage_pct !== null && (
                 <span className={b.wastage_flagged ? "text-rose-700 font-bold" : "text-emerald-700 font-semibold"}>
-                  Actual Waste: {b.actual_wastage_pct}% (Limit {b.allowed_wastage_pct}%)
+                  {tr("Actual Waste", "உண்மை வீண்")}: {b.actual_wastage_pct}% ({tr("Limit", "வரம்பு")} {b.allowed_wastage_pct}%)
                 </span>
               )}
             </div>
@@ -571,7 +607,7 @@ export function BeamsPage() {
             {mountBeamId === b.id && (
               <div className="pt-2 border-t border-slate-200 flex flex-wrap items-center gap-2">
                 {freeLooms.length === 0 ? (
-                  <span className="text-xs text-rose-700">No free operational looms available. Unload a loom first.</span>
+                  <span className="text-xs text-rose-700">{tr("No free operational looms available. Unload a loom first.", "காலி தறிகள் இல்லை. முதலில் ஒரு தறியிலிருந்து பீமை இறக்கவும்.")}</span>
                 ) : (
                   <>
                     <select
@@ -590,7 +626,7 @@ export function BeamsPage() {
                       onClick={() => void handleMount(b.id)}
                       className="px-3 py-1.5 rounded bg-emerald-700 text-white text-xs font-semibold"
                     >
-                      Confirm Mount
+                      {tr("Confirm Mount", "ஏற்றத்தை உறுதி செய்")}
                     </button>
                   </>
                 )}
@@ -601,19 +637,19 @@ export function BeamsPage() {
             {unloadBeamId === b.id && (
               <div className="pt-2 border-t border-slate-200 grid sm:grid-cols-4 gap-2 items-end">
                 <div>
-                  <label className="text-[11px] text-slate-500 block">Unload Reason</label>
+                  <label className="text-[11px] text-slate-500 block">{tr("Unload Reason", "இறக்கும் காரணம்")}</label>
                   <select
                     value={unloadReason}
                     onChange={(e) => setUnloadReason(e.target.value as UnloadReason)}
                     className="w-full px-2.5 py-1.5 rounded border border-slate-300 text-xs"
                   >
-                    <option value="COMPLETED">Completed (Warp Finished)</option>
-                    <option value="PARTIAL_UNLOAD">Partial Unload (Back to Stock)</option>
-                    <option value="TRANSFER">Transfer to Another Loom</option>
+                    <option value="COMPLETED">{tr("Completed (Warp Finished)", "முடிந்தது (பாவு தீர்ந்தது)")}</option>
+                    <option value="PARTIAL_UNLOAD">{tr("Partial Unload (Back to Stock)", "பாதியில் இறக்கம் (இருப்புக்கு)")}</option>
+                    <option value="TRANSFER">{tr("Transfer to Another Loom", "வேறொரு தறிக்கு மாற்றம்")}</option>
                   </select>
                 </div>
                 <div>
-                  <label className="text-[11px] text-slate-500 block">Returned Leftover Weft (kg)</label>
+                  <label className="text-[11px] text-slate-500 block">{tr("Returned Leftover Weft (kg)", "திருப்பிய மீதி ஊடை (கிலோ)")}</label>
                   <input
                     type="number"
                     step="0.001"
@@ -623,7 +659,7 @@ export function BeamsPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] text-slate-500 block">Actual Tail Waste (m, optional)</label>
+                  <label className="text-[11px] text-slate-500 block">{tr("Actual Tail Waste (m, optional)", "கடைசி வீண் (மீ, விருப்பம்)")}</label>
                   <input
                     type="number"
                     step="0.01"
@@ -637,7 +673,7 @@ export function BeamsPage() {
                   onClick={() => void handleUnload(b.id)}
                   className="px-3 py-1.5 rounded bg-slate-900 text-white text-xs font-semibold"
                 >
-                  Confirm Unload
+                  {tr("Confirm Unload", "இறக்கத்தை உறுதி செய்")}
                 </button>
               </div>
             )}
@@ -648,17 +684,17 @@ export function BeamsPage() {
       {/* Recent Weft Receipts */}
       {receipts.length > 0 && (
         <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-2">
-          <h3 className="text-sm font-bold">Recent Weft Receipts ({receipts.length})</h3>
+          <h3 className="text-sm font-bold">{tr(`Recent Weft Receipts (${receipts.length})`, `சமீபத்திய ஊடை நூல் பதிவுகள் (${receipts.length})`)}</h3>
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-left">
               <thead className="text-slate-500 border-b border-slate-200">
                 <tr>
-                  <th className="py-1.5 pr-3">Date</th>
-                  <th className="py-1.5 pr-3">Warp Beam</th>
-                  <th className="py-1.5 pr-3">Bags</th>
-                  <th className="py-1.5 pr-3">Net Weight (kg)</th>
-                  <th className="py-1.5 pr-3">Note</th>
-                  <th className="py-1.5">Action</th>
+                  <th className="py-1.5 pr-3">{tr("Date", "தேதி")}</th>
+                  <th className="py-1.5 pr-3">{tr("Warp Beam", "பீம்")}</th>
+                  <th className="py-1.5 pr-3">{tr("Bags", "மூட்டை")}</th>
+                  <th className="py-1.5 pr-3">{tr("Net Weight (kg)", "எடை (கிலோ)")}</th>
+                  <th className="py-1.5 pr-3">{tr("Note", "குறிப்பு")}</th>
+                  <th className="py-1.5">{tr("Action", "செயல்")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -682,7 +718,7 @@ export function BeamsPage() {
                           }
                           className="text-rose-600 hover:underline inline-flex items-center gap-0.5 cursor-pointer"
                         >
-                          <Trash2 className="w-3 h-3" /> Void
+                          <Trash2 className="w-3 h-3" /> {tr("Void", "நீக்கு")}
                         </button>
                       </td>
                     </tr>

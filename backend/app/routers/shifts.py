@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit, snapshot_fields, soft_delete_record
+from app.core.config import now_ist, today_ist
 from app.core.database import get_db
 from app.core.security import get_current_user, require_owner
 from app.models.core import (
@@ -165,8 +166,8 @@ def get_shift_prefill(
 ) -> ShiftPrefillResponse:
     """Return smart defaults per operational loom (active beam, carried-forward weaver & counter)."""
     settings = db.scalar(select(UnitSettings).limit(1))
-    now_local = datetime.now()
-    suggested_date = date.today()
+    now_local = now_ist()
+    suggested_date = today_ist()
     cutoff = settings.shift_cutoff_hour if settings else 18
     max_shifts = settings.shifts_per_day if settings else 2
     suggested_shift = 1 if now_local.hour < cutoff else min(2, max_shifts)
@@ -214,16 +215,24 @@ def get_shift_prefill(
     for item in hydrated_existing:
         existing_by_loom.setdefault(item.loom_id, []).append(item)
 
-    # Latest non-deleted shift per loom before or up to target_date for carry-forward
-    recent_shifts = db.scalars(
-        select(ShiftEntry)
+    # O(N_looms) SQL window query: fetch ONLY the single most recent shift per loom (never full-table scan)
+    ranked_sub = (
+        select(
+            ShiftEntry.id.label("sid"),
+            func.row_number()
+            .over(
+                partition_by=ShiftEntry.loom_id,
+                order_by=(ShiftEntry.entry_date.desc(), ShiftEntry.shift_no.desc(), ShiftEntry.id.desc()),
+            )
+            .label("rn"),
+        )
         .where(ShiftEntry.is_deleted.is_(False))
-        .order_by(ShiftEntry.entry_date.desc(), ShiftEntry.shift_no.desc(), ShiftEntry.id.desc())
+        .subquery()
+    )
+    latest_rows = db.scalars(
+        select(ShiftEntry).join(ranked_sub, ShiftEntry.id == ranked_sub.c.sid).where(ranked_sub.c.rn == 1)
     ).all()
-    latest_by_loom: dict[int, ShiftEntry] = {}
-    for sh in recent_shifts:
-        if sh.loom_id not in latest_by_loom:
-            latest_by_loom[sh.loom_id] = sh
+    latest_by_loom: dict[int, ShiftEntry] = {sh.loom_id: sh for sh in latest_rows}
 
     prefill_rows = []
     for l in looms:
@@ -297,12 +306,28 @@ def save_shift_batch(
     saved_entries: list[ShiftEntry] = []
     touched_beams: set[int] = set()
 
+    valid_loom_ids = set(db.scalars(select(Loom.id)).all())
+    valid_weaver_ids = set(db.scalars(select(Weaver.id)).all())
+    valid_beam_ids = set(db.scalars(select(Beam.id)).all())
+
     for r in payload.rows:
+        if r.loom_id not in valid_loom_ids:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Loom {r.loom_id} not found")
+        if r.weaver_id not in valid_weaver_ids:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Weaver {r.weaver_id} not found")
+        if r.beam_id is not None and r.beam_id not in valid_beam_ids:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Beam {r.beam_id} not found")
+
         net_m = _compute_net_metres(r.entry_mode, r.start_meter, r.end_meter, r.net_metres, r.meter_reset)
         planned = r.planned_mins if r.planned_mins is not None else default_planned
 
         # 1. Exact idempotent replay check on client_uuid
         by_uuid = db.scalar(select(ShiftEntry).where(ShiftEntry.client_uuid == r.client_uuid))
+        if by_uuid and by_uuid.is_deleted:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="This shift entry was previously voided; refresh and submit with a new row.",
+            )
         if by_uuid and not by_uuid.is_deleted:
             old = snapshot_fields(
                 by_uuid,
@@ -488,6 +513,8 @@ def soft_delete_shift_entry(
         reason=payload.reason.strip(),
         audit_fields=["loom_id", "weaver_id", "entry_date", "shift_no", "net_metres"],
     )
+    if entry.beam_id:
+        sync_weft_wastage_alert(db, entry.beam_id)
     db.commit()
     db.refresh(entry)
     return _hydrate_shift_rows(db, [entry])[0]

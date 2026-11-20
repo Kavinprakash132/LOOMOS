@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { apiRequest, formatHoursFromMins } from "../../api/client";
 import { PasswordInput } from "../PasswordInput";
+import { useAuth } from "../../context/AuthContext";
 import { UnitSettings, User } from "../../types/api";
 
 export function TeamUnitTab({
@@ -14,6 +15,7 @@ export function TeamUnitTab({
   onRefresh: () => Promise<void>;
   onError: (msg: string) => void;
 }) {
+  const { t, tr } = useAuth();
   const [unitName, setUnitName] = useState(settings?.unit_name ?? "");
   const [location, setLocation] = useState(settings?.location ?? "");
   const [sanctionedKw, setSanctionedKw] = useState(settings?.sanctioned_kw ?? "10.00");
@@ -90,11 +92,11 @@ export function TeamUnitTab({
   return (
     <div className="space-y-6">
       <form onSubmit={saveUnit} className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
-        <h3 className="text-sm font-bold">Shed Settings</h3>
+        <h3 className="text-sm font-bold">{tr("Shed Settings", "ஆலை அமைப்புகள்")}</h3>
         <div className="grid sm:grid-cols-2 gap-3">
           <div>
             <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-              Shed / Unit Name <span className="text-rose-600">*</span>
+              {tr("Shed / Unit Name", "ஆலை / தறிக்கூட பெயர்")} <span className="text-rose-600">*</span>
             </label>
             <input
               required
@@ -106,7 +108,7 @@ export function TeamUnitTab({
           </div>
           <div>
             <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-              Town / Location
+              {tr("Town / Location", "ஊர் / பகுதி")}
             </label>
             <input
               value={location}
@@ -117,7 +119,7 @@ export function TeamUnitTab({
           </div>
           <div>
             <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-              Sanctioned EB Power Load (kW)
+              {tr("Sanctioned EB Power Load (kW)", "அனுமதி EB மின் சுமை (kW)")}
             </label>
             <input
               type="number"
@@ -131,21 +133,24 @@ export function TeamUnitTab({
           </div>
           <div>
             <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-              Shifts Per Day
+              {tr("Shifts Per Day", "ஒரு நாளைக்கு ஷிப்டுகள்")}
             </label>
             <select
               value={shiftsPerDay}
               onChange={(e) => setShiftsPerDay(Number(e.target.value))}
               className="w-full px-3 py-2 rounded border border-slate-300 text-sm bg-white"
             >
-              <option value={1}>1 Shift / Day</option>
-              <option value={2}>2 Shifts / Day (Day &amp; Night)</option>
-              <option value={3}>3 Shifts / Day</option>
+              <option value={1}>{tr("1 Shift / Day", "1 ஷிப்ட் / நாள்")}</option>
+              <option value={2}>{tr("2 Shifts / Day (Day & Night)", "2 ஷிப்ட் / நாள் (பகல் & இரவு)")}</option>
+              <option value={3}>{tr("3 Shifts / Day", "3 ஷிப்ட் / நாள்")}</option>
             </select>
           </div>
           <div>
             <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-              Shift Duration ({formatHoursFromMins(plannedShiftMins)} hrs · enter mins, e.g. 600 = 10.00 hrs)
+              {tr(
+                `Shift Duration (${formatHoursFromMins(plannedShiftMins)} hrs · enter mins, e.g. 600 = 10.00 hrs)`,
+                `ஷிப்ட் நேரம் (${formatHoursFromMins(plannedShiftMins)} மணி · நிமிடங்களில், எ.கா. 600 = 10 மணி)`
+              )}
             </label>
             <input
               type="number"
@@ -159,16 +164,16 @@ export function TeamUnitTab({
           </div>
         </div>
         <button type="submit" className="px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold">
-          Save Shed Settings
+          {tr("Save Shed Settings", "அமைப்புகளை சேமி")}
         </button>
       </form>
 
       <form onSubmit={addSupervisor} className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
-        <h3 className="text-sm font-bold">Create Supervisor Account (Shift &amp; Photo Access Only)</h3>
+        <h3 className="text-sm font-bold">{tr("Create Supervisor Account (Shift & Photo Access Only)", "மேற்பார்வையாளர் கணக்கு உருவாக்கு (ஷிப்ட் & படம் மட்டும்)")}</h3>
         <div className="grid sm:grid-cols-3 gap-2">
           <div>
             <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-              Supervisor Full Name <span className="text-rose-600">*</span>
+              {tr("Supervisor Full Name", "மேற்பார்வையாளர் பெயர்")} <span className="text-rose-600">*</span>
             </label>
             <input
               required
@@ -180,7 +185,7 @@ export function TeamUnitTab({
           </div>
           <div>
             <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-              Login Username <span className="text-rose-600">*</span>
+              {tr("Login Username", "பயனர் பெயர்")} <span className="text-rose-600">*</span>
             </label>
             <input
               required
@@ -192,13 +197,13 @@ export function TeamUnitTab({
           </div>
           <div>
             <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-              Password (min 6 chars) <span className="text-rose-600">*</span>
+              {tr("Password (min 6 chars)", "கடவுச்சொல் (6+ எழுத்துகள்)")} <span className="text-rose-600">*</span>
             </label>
             <PasswordInput
               required
               minLength={6}
               autoComplete="new-password"
-              placeholder="6+ characters"
+              placeholder={tr("6+ characters", "6+ எழுத்துகள்")}
               value={supPass}
               onChange={(e) => setSupPass(e.target.value)}
               className="w-full px-3 py-2 rounded border border-slate-300 text-sm"
@@ -206,7 +211,7 @@ export function TeamUnitTab({
           </div>
         </div>
         <button type="submit" className="px-4 py-2 rounded-lg bg-amber-500 text-slate-950 text-xs font-bold">
-          Add Supervisor
+          {tr("Add Supervisor", "மேற்பார்வையாளர் சேர்")}
         </button>
       </form>
 
@@ -216,14 +221,14 @@ export function TeamUnitTab({
             <div>
               <span className="font-semibold">{u.full_name}</span>
               <span className="ml-2 text-xs font-mono text-slate-500">@{u.username}</span>
-              <span className="ml-2 px-2 py-0.5 rounded bg-slate-100 text-[11px] font-semibold">{u.role}</span>
+              <span className="ml-2 px-2 py-0.5 rounded bg-slate-100 text-[11px] font-semibold">{t(`role_${u.role}`)}</span>
             </div>
             <button
               type="button"
               onClick={() => void toggleUser(u)}
               className="text-xs font-semibold text-amber-700 hover:underline"
             >
-              {u.is_active ? "Active (Deactivate)" : "Inactive (Activate)"}
+              {u.is_active ? tr("Active (Deactivate)", "செயலில் (நிறுத்து)") : tr("Inactive (Activate)", "நிறுத்தப்பட்டது (இயக்கு)")}
             </button>
           </div>
         ))}

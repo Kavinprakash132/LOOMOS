@@ -5,9 +5,10 @@ from __future__ import annotations
 from datetime import date, timedelta
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Body, Depends, Response
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
+from app.core.config import today_ist
 from app.core.database import get_db
 from app.core.security import get_current_user, require_owner
 from app.models.core import User
@@ -44,9 +45,9 @@ def get_analytics_overview(
 
 @router.get("/analytics/eb-estimate")
 def get_eb_estimate_for_metres(
-    metres: float,
-    _user: Annotated[User, Depends(get_current_user)],
-    db: Annotated[Session, Depends(get_db)],
+    metres: float = Query(ge=0, le=10_000_000),
+    _user: Annotated[User, Depends(get_current_user)] = None,  # type: ignore[assignment]
+    db: Annotated[Session, Depends(get_db)] = None,  # type: ignore[assignment]
 ) -> dict[str, Any]:
     """Estimate bi-monthly EB units and itemized TNPDCL bill for a target metres woven."""
     return estimate_eb_for_metres(db, metres)
@@ -54,10 +55,10 @@ def get_eb_estimate_for_metres(
 
 @router.get("/analytics/eb-calculate")
 def get_custom_eb_bill_calculation(
-    units_kwh: float,
-    sanctioned_kw: float | None = None,
-    billing_days: int | None = None,
-    recorded_demand_kw: float | None = None,
+    units_kwh: float = Query(ge=0, le=10_000_000),
+    sanctioned_kw: float | None = Query(default=None, gt=0, le=5000),
+    billing_days: int | None = Query(default=None, ge=1, le=366),
+    recorded_demand_kw: float | None = Query(default=None, ge=0, le=5000),
     _user: Annotated[User, Depends(get_current_user)] = None,  # type: ignore[assignment]
     db: Annotated[Session, Depends(get_db)] = None,  # type: ignore[assignment]
 ) -> dict[str, Any]:
@@ -99,8 +100,10 @@ def get_printable_statement(
     db: Annotated[Session, Depends(get_db)] = None,  # type: ignore[assignment]
 ) -> dict[str, Any]:
     """Return Monthly P&L & Trader Account Statement data for HTML Print / PDF."""
-    end = to_date or date.today()
+    end = to_date or today_ist()
     start = from_date or (end - timedelta(days=29))
+    if end < start:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="to_date must be >= from_date")
     return build_printable_statement(db, from_date=start, to_date=end, trader_id=trader_id)
 
 
@@ -109,9 +112,9 @@ def download_full_excel_workbook(
     _owner: Annotated[User, Depends(require_owner)],
     db: Annotated[Session, Depends(get_db)],
 ) -> Response:
-    """Download formatted 6-sheet Excel workbook (.xlsx)."""
+    """Download formatted Excel workbook (.xlsx)."""
     data = build_full_xlsx_workbook(db)
-    filename = f"loomos_full_report_{date.today().isoformat()}.xlsx"
+    filename = f"loomos_full_report_{today_ist().isoformat()}.xlsx"
     return Response(
         content=data,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

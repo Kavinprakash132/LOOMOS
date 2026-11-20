@@ -7,7 +7,7 @@ import { useAuth } from "../context/AuthContext";
 import { FloorDashboard, OwnerDashboard } from "../types/api";
 
 export function DashboardPage() {
-  const { user } = useAuth();
+  const { user, tr } = useAuth();
   const isOwner = user?.role === "OWNER";
 
   const [rangeMode, setRangeMode] = useState<"weekly" | "monthly" | "custom">("weekly");
@@ -25,9 +25,9 @@ export function DashboardPage() {
       const resp = await apiRequest<OwnerDashboard | FloorDashboard>(endpoint);
       setData(resp);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load dashboard");
+      setError(err instanceof Error ? err.message : tr("Failed to load dashboard", "முகப்பு தகவலை ஏற்ற முடியவில்லை"));
     }
-  }, [fromDate, toDate, isOwner]);
+  }, [fromDate, toDate, isOwner, tr]);
 
   useEffect(() => {
     void loadDashboard();
@@ -55,10 +55,11 @@ export function DashboardPage() {
         <div>
           <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-amber-600" />
-            Shed Overview &amp; Output Dashboard
+            {tr("Shed Overview & Output Dashboard", "ஆலை சுருக்கம் & உற்பத்தி முகப்பு")}
           </h1>
           <p className="text-xs text-slate-500">
-            Active dates: <b>{formatDateDMY(fromDate)}</b> to <b>{formatDateDMY(toDate)}</b> — cloth woven, loom speed check, alerts &amp; money summary.
+            {tr("Active dates", "தேதி வரம்பு")}: <b>{formatDateDMY(fromDate)}</b> {tr("to", "முதல்")} <b>{formatDateDMY(toDate)}</b>{" "}
+            {tr("— cloth woven, loom speed check, alerts & money summary.", "வரை — நெய்த துணி, தறி வேகம், எச்சரிக்கைகள் & வரவு-செலவு.")}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -71,7 +72,7 @@ export function DashboardPage() {
                 : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
             }`}
           >
-            Weekly (7d)
+            {tr("Weekly (7d)", "வாரம் (7 நாட்கள்)")}
           </button>
           <button
             type="button"
@@ -82,10 +83,10 @@ export function DashboardPage() {
                 : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
             }`}
           >
-            Monthly (30d)
+            {tr("Monthly (30d)", "மாதம் (30 நாட்கள்)")}
           </button>
           <div className="flex items-center gap-1.5 bg-white px-2 py-1 rounded-lg border border-slate-300">
-            <span className="text-[11px] font-semibold text-slate-500">From</span>
+            <span className="text-[11px] font-semibold text-slate-500">{tr("From", "முதல்")}</span>
             <input
               type="date"
               value={fromDate}
@@ -95,7 +96,7 @@ export function DashboardPage() {
               }}
               className="px-1.5 py-0.5 rounded text-xs font-medium focus:outline-none"
             />
-            <span className="text-slate-400">to</span>
+            <span className="text-slate-400">{tr("to", "வரை")}</span>
             <input
               type="date"
               value={toDate}
@@ -112,7 +113,10 @@ export function DashboardPage() {
       {error && <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-sm">{error}</div>}
 
       <PageGuideBanner
-        tip="Start here each day to check cloth woven, open alerts, and shed profit. Use the quick buttons below to jump straight to daily work."
+        tip={tr(
+          "Start here each day to check cloth woven, open alerts, and shed profit. Use the quick buttons below to jump straight to daily work.",
+          "தினமும் இங்கிருந்து நெய்த துணி, எச்சரிக்கைகள் மற்றும் ஆலை லாபத்தைச் சரிபார்க்கவும். கீழே உள்ள விரைவு பட்டன்களைப் பயன்படுத்தவும்."
+        )}
       />
 
       {/* Quick Actions Strip */}
@@ -122,14 +126,14 @@ export function DashboardPage() {
           className="flex items-center gap-2.5 p-3 rounded-xl bg-amber-500 text-slate-950 font-bold text-sm hover:bg-amber-400 transition shadow-sm"
         >
           <ClipboardCheck className="w-4 h-4 shrink-0" />
-          <span>+ Log Today's Shift</span>
+          <span>{tr("+ Log Today's Shift", "+ இன்றைய ஷிப்ட் பதிவு")}</span>
         </Link>
         <Link
           to="/analytics?tab=eb"
           className="flex items-center gap-2.5 p-3 rounded-xl bg-white border border-slate-200 text-slate-800 font-semibold text-sm hover:border-amber-400 hover:bg-amber-50/40 transition"
         >
           <Zap className="w-4 h-4 text-amber-600 shrink-0" />
-          <span>EB Bill Calculator</span>
+          <span>{tr("EB Bill Calculator", "EB பில் கணக்கீடு")}</span>
         </Link>
         {isOwner ? (
           <Link
@@ -137,7 +141,7 @@ export function DashboardPage() {
             className="flex items-center gap-2.5 p-3 rounded-xl bg-white border border-slate-200 text-slate-800 font-semibold text-sm hover:border-amber-400 hover:bg-amber-50/40 transition"
           >
             <Truck className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>+ Delivery / EB Bill</span>
+            <span>{tr("+ Delivery / EB Bill", "+ டெலிவரி / EB பில்")}</span>
           </Link>
         ) : (
           <Link
@@ -145,7 +149,7 @@ export function DashboardPage() {
             className="flex items-center gap-2.5 p-3 rounded-xl bg-white border border-slate-200 text-slate-800 font-semibold text-sm hover:border-amber-400 hover:bg-amber-50/40 transition"
           >
             <Layers className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>Beams &amp; Yarn</span>
+            <span>{tr("Beams & Yarn", "பீம் & நூல்")}</span>
           </Link>
         )}
         <Link
@@ -153,7 +157,7 @@ export function DashboardPage() {
           className="flex items-center gap-2.5 p-3 rounded-xl bg-white border border-slate-200 text-slate-800 font-semibold text-sm hover:border-amber-400 hover:bg-amber-50/40 transition"
         >
           <Camera className="w-4 h-4 text-indigo-600 shrink-0" />
-          <span>Check Cloth Photo</span>
+          <span>{tr("Check Cloth Photo", "துணி குறைபாடு ஆய்வு")}</span>
         </Link>
       </div>
 
@@ -162,49 +166,61 @@ export function DashboardPage() {
           {/* Operational Summary Cards */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="bg-white p-4 rounded-xl border border-slate-200">
-              <div className="text-xs text-slate-500">Today ({formatDateDMY(data.today_date)})</div>
+              <div className="text-xs text-slate-500">
+                {tr("Today", "இன்று")} ({formatDateDMY(data.today_date)})
+              </div>
               <div className="text-2xl font-bold text-slate-900 mt-0.5">{data.today_metres} m</div>
               <div className="text-[11px] text-slate-500 mt-0.5">
-                {data.active_looms_count} / {data.operational_looms_count} shuttle looms active
+                {tr(
+                  `${data.active_looms_count} / ${data.operational_looms_count} shuttle looms active`,
+                  `${data.active_looms_count} / ${data.operational_looms_count} தறிகள் இயங்குகின்றன`
+                )}
               </div>
             </div>
             <div className="bg-white p-4 rounded-xl border border-slate-200">
               <div className="text-xs text-slate-500">
-                {rangeMode === "weekly" ? "Weekly Output" : rangeMode === "monthly" ? "Monthly Output" : "Period Output"}
+                {rangeMode === "weekly"
+                  ? tr("Weekly Output", "வார உற்பத்தி")
+                  : rangeMode === "monthly"
+                    ? tr("Monthly Output", "மாத உற்பத்தி")
+                    : tr("Period Output", "கால உற்பத்தி")}
               </div>
               <div className="text-2xl font-bold text-slate-900 mt-0.5">{data.period_metres} m</div>
               <div className="text-[11px] text-slate-500 mt-0.5">
                 {data.total_downtime_mins > 0
-                  ? `${formatHoursFromMins(data.total_downtime_mins)} hrs stopped across shifts`
-                  : "All logged shifts ran"}
+                  ? tr(
+                      `${formatHoursFromMins(data.total_downtime_mins)} hrs stopped across shifts`,
+                      `ஷிப்டுகளில் ${formatHoursFromMins(data.total_downtime_mins)} மணி நிறுத்தம்`
+                    )
+                  : tr("All logged shifts ran", "பதிவு செய்த அனைத்து ஷிப்டுகளும் ஓடின")}
               </div>
             </div>
             <div className="bg-white p-4 rounded-xl border border-slate-200">
               <div className="text-xs text-slate-500 flex items-center gap-1">
-                <Layers className="w-3.5 h-3.5 text-amber-600" /> Active Warp Beams
+                <Layers className="w-3.5 h-3.5 text-amber-600" /> {tr("Active Warp Beams", "ஓடும் பாவு பீம்கள்")}
               </div>
               <div className="text-2xl font-bold text-slate-900 mt-0.5">{data.running_beams_count}</div>
               <div className="text-[11px] text-slate-500 mt-0.5">
-                Yarn rolls currently weaving on looms
+                {tr("Yarn rolls currently weaving on looms", "தற்போது தறிகளில் ஓடும் பீம்கள்")}
               </div>
             </div>
             <div className="bg-white p-4 rounded-xl border border-slate-200">
               <div className="text-xs text-slate-500 flex items-center gap-1">
-                <AlertTriangle className="w-3.5 h-3.5 text-rose-600" /> Open Shed Alerts
+                <AlertTriangle className="w-3.5 h-3.5 text-rose-600" /> {tr("Open Shed Alerts", "திறந்த எச்சரிக்கைகள்")}
               </div>
               <div className={`text-2xl font-bold mt-0.5 ${data.open_alerts.length > 0 ? "text-rose-600" : "text-emerald-700"}`}>
                 {data.open_alerts.length}
               </div>
-              <div className="text-[11px] text-slate-500 mt-0.5">Rate cuts &amp; yarn wastage alerts</div>
+              <div className="text-[11px] text-slate-500 mt-0.5">{tr("Rate cuts & yarn wastage alerts", "விலை குறைப்பு & நூல் வீண் எச்சரிக்கைகள்")}</div>
             </div>
           </div>
 
-          {/* Machine Running & Speed Check (Plain-English Efficiency) */}
+          {/* Machine Running & Speed Check */}
           <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-sm font-bold flex items-center gap-1.5">
                 <Gauge className="w-4 h-4 text-amber-600" />
-                Machine Running &amp; Weaving Speed Efficiency
+                {tr("Machine Running & Weaving Speed Efficiency", "இயந்திர இயக்கம் & நெசவு வேகத் திறன்")}
               </h2>
               <span
                 className={`px-2.5 py-0.5 rounded text-[11px] font-bold ${
@@ -212,51 +228,54 @@ export function DashboardPage() {
                 }`}
               >
                 {data.quality_recorded
-                  ? "MACHINE + CLOTH QUALITY ACTIVE"
-                  : "RUNNING & SPEED ONLY · DEFECT CHECK PENDING"}
+                  ? tr("MACHINE + CLOTH QUALITY ACTIVE", "இயந்திரம் + துணி தரம் செயலில்")
+                  : tr("RUNNING & SPEED ONLY · DEFECT CHECK PENDING", "இயக்கம் & வேகம் மட்டும் · குறைபாடு பதிவு இல்லை")}
               </span>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
               <div className="bg-slate-50 p-3 rounded-lg">
-                <div className="text-slate-600 font-semibold">Time Run % (Availability)</div>
+                <div className="text-slate-600 font-semibold">{tr("Time Run % (Availability)", "இயங்கிய நேரம் %")}</div>
                 <div className="text-lg font-bold text-slate-900 mt-0.5">
                   {data.availability_pct !== null ? `${data.availability_pct}%` : "N/A"}
                 </div>
                 <div className="text-[11px] text-slate-500 mt-0.5">
-                  {formatHoursFromMins(data.total_operating_mins)} out of {formatHoursFromMins(data.total_planned_mins)} shift hrs ran
+                  {tr(
+                    `${formatHoursFromMins(data.total_operating_mins)} out of ${formatHoursFromMins(data.total_planned_mins)} shift hrs ran`,
+                    `${formatHoursFromMins(data.total_planned_mins)} மணி ஷிப்டில் ${formatHoursFromMins(data.total_operating_mins)} மணி ஓடியது`
+                  )}
                 </div>
               </div>
 
               <div className="bg-slate-50 p-3 rounded-lg">
-                <div className="text-slate-600 font-semibold">Weaving Speed % (Performance)</div>
+                <div className="text-slate-600 font-semibold">{tr("Weaving Speed % (Performance)", "நெசவு வேகம் %")}</div>
                 <div className="text-lg font-bold text-slate-900 mt-0.5">
                   {data.performance_pct !== null ? `${data.performance_pct}%` : "N/A"}
                 </div>
                 <div className="text-[11px] text-slate-500 mt-0.5">
-                  Target speed: {data.total_ideal_metres} m (at RPM &amp; Pick)
+                  {tr(`Target speed: ${data.total_ideal_metres} m (at RPM & Pick)`, `இலக்கு: ${data.total_ideal_metres} மீ (RPM & பிக்)`)}
                 </div>
               </div>
 
               <div className="bg-amber-50 p-3 rounded-lg border border-amber-200">
-                <div className="text-amber-900 font-semibold">Combined Efficiency %</div>
+                <div className="text-amber-900 font-semibold">{tr("Combined Efficiency %", "மொத்த தறி திறன் %")}</div>
                 <div className="text-lg font-bold text-amber-900 mt-0.5">
                   {data.utilization_ap_pct !== null ? `${data.utilization_ap_pct}%` : "N/A"}
                 </div>
-                <div className="text-[11px] text-amber-800 mt-0.5">Overall loom output score</div>
+                <div className="text-[11px] text-amber-800 mt-0.5">{tr("Overall loom output score", "ஒட்டுமொத்த உற்பத்தி மதிப்பீடு")}</div>
               </div>
 
               <div className="bg-slate-50 p-3 rounded-lg">
-                <div className="text-slate-600 font-semibold">Defect-Free Cloth % (Quality)</div>
+                <div className="text-slate-600 font-semibold">{tr("Defect-Free Cloth % (Quality)", "குறைபாடற்ற துணி % (தரம்)")}</div>
                 <div className="text-lg font-bold text-slate-900 mt-0.5">
                   {data.quality_recorded && data.full_oee_pct !== null
                     ? `${data.quality_pct}% · OEE ${data.full_oee_pct}%`
-                    : "No Defects Logged Yet"}
+                    : tr("No Defects Logged Yet", "குறைபாடு பதிவு இல்லை")}
                 </div>
                 <div className="text-[11px] text-slate-500 mt-0.5">
                   {data.quality_recorded
-                    ? `Defective: ${data.confirmed_defective_metres} m`
-                    : "Enter damaged metres in Daily Shift to unlock"}
+                    ? tr(`Defective: ${data.confirmed_defective_metres} m`, `சேதமானது: ${data.confirmed_defective_metres} மீ`)
+                    : tr("Enter damaged metres in Daily Shift to unlock", "தினசரி ஷிப்டில் சேத மீட்டரை பதிந்தால் காட்டும்")}
                 </div>
               </div>
             </div>
@@ -269,47 +288,47 @@ export function DashboardPage() {
             <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
               <h2 className="text-sm font-bold flex items-center gap-1.5">
                 <IndianRupee className="w-4 h-4 text-emerald-700" />
-                Owner Money Summary ({formatDateDMY(data.period_start)} to {formatDateDMY(data.period_end)})
+                {tr("Owner Money Summary", "உரிமையாளர் வரவு-செலவு சுருக்கம்")} ({formatDateDMY(data.period_start)} – {formatDateDMY(data.period_end)})
               </h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
                 <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200">
-                  <div className="text-emerald-800">Billed Delivery Income</div>
+                  <div className="text-emerald-800">{tr("Billed Delivery Income", "டெலிவரி வருமானம்")}</div>
                   <div className="text-lg font-bold text-emerald-900">
                     {formatRupeesFromPaise(ownerFin.billed_revenue_paise)}
                   </div>
                 </div>
                 <div className="p-3 rounded-lg bg-slate-50">
-                  <div className="text-slate-600">Wages + EB + Expenses</div>
+                  <div className="text-slate-600">{tr("Wages + EB + Expenses", "கூலி + EB + செலவுகள்")}</div>
                   <div className="text-lg font-bold text-slate-900">
                     {formatRupeesFromPaise(
                       ownerFin.finalized_wages_paise + ownerFin.eb_bills_paise + ownerFin.expenses_paise
                     )}
                   </div>
                   <div className="text-[11px] text-slate-500">
-                    Wages: {formatRupeesFromPaise(ownerFin.finalized_wages_paise)} · EB:{" "}
-                    {formatRupeesFromPaise(ownerFin.eb_bills_paise)} · Exp:{" "}
+                    {tr("Wages", "கூலி")}: {formatRupeesFromPaise(ownerFin.finalized_wages_paise)} · EB:{" "}
+                    {formatRupeesFromPaise(ownerFin.eb_bills_paise)} · {tr("Exp", "செலவு")}:{" "}
                     {formatRupeesFromPaise(ownerFin.expenses_paise)}
                   </div>
                   {ownerFin.eb_bills_paise === 0 && (
                     <div className="text-[10px] text-amber-700 mt-0.5">
-                      No bi-monthly EB bill closed inside these dates.
+                      {tr("No bi-monthly EB bill closed inside these dates.", "இந்த தேதிகளில் EB பில் ஏதும் இல்லை.")}
                     </div>
                   )}
                 </div>
                 <div className="p-3 rounded-lg bg-slate-900 text-white">
-                  <div className="text-slate-300">Net Operating Balance</div>
+                  <div className="text-slate-300">{tr("Net Operating Balance", "நிகர இருப்பு (லாபம்)")}</div>
                   <div className="text-lg font-bold text-amber-400">
                     {formatRupeesFromPaise(ownerFin.net_operating_paise)}
                   </div>
                 </div>
                 <div className="p-3 rounded-lg bg-slate-50">
-                  <div className="text-slate-600">Pending Trader Balance (All-Time)</div>
+                  <div className="text-slate-600">{tr("Pending Trader Balance (All-Time)", "வியாபாரிகள் பாக்கி (மொத்தம்)")}</div>
                   <div className="text-lg font-bold text-slate-900">
                     {formatRupeesFromPaise(ownerFin.total_receivable_paise)}
                   </div>
                   {ownerFin.total_rate_underpayment_paise > 0 && (
                     <div className="text-[11px] text-rose-700 font-bold">
-                      Rate-Cut Loss: {formatRupeesFromPaise(ownerFin.total_rate_underpayment_paise)}
+                      {tr("Rate-Cut Loss", "விலை குறைப்பு இழப்பு")}: {formatRupeesFromPaise(ownerFin.total_rate_underpayment_paise)}
                     </div>
                   )}
                 </div>
@@ -320,11 +339,12 @@ export function DashboardPage() {
           {/* Open Alerts Center */}
           <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-2">
             <h2 className="text-sm font-bold flex items-center gap-1.5">
-              <Activity className="w-4 h-4 text-amber-600" /> Active Alerts ({data.open_alerts.length})
+              <Activity className="w-4 h-4 text-amber-600" /> {tr(`Active Alerts (${data.open_alerts.length})`, `செயலில் உள்ள எச்சரிக்கைகள் (${data.open_alerts.length})`)}
             </h2>
             {data.open_alerts.length === 0 ? (
               <div className="text-xs text-emerald-700 flex items-center gap-1.5 py-2">
-                <CheckCircle2 className="w-4 h-4" /> All clear — no open rate cuts or wastage alerts.
+                <CheckCircle2 className="w-4 h-4" />{" "}
+                {tr("All clear — no open rate cuts or wastage alerts.", "எல்லாம் சீராக உள்ளது — எச்சரிக்கைகள் இல்லை.")}
               </div>
             ) : (
               <div className="divide-y divide-slate-100">
@@ -345,7 +365,7 @@ export function DashboardPage() {
                       onClick={() => void dismissAlert(a.id)}
                       className="text-slate-500 underline shrink-0"
                     >
-                      Dismiss
+                      {tr("Dismiss", "நீக்கு")}
                     </button>
                   </div>
                 ))}
@@ -356,19 +376,19 @@ export function DashboardPage() {
           {/* Per-Loom Performance Table */}
           <div className="bg-white p-4 rounded-xl border border-slate-200 overflow-x-auto space-y-2">
             <h2 className="text-sm font-bold">
-              Per-Loom Breakdown ({formatDateDMY(fromDate)} to {formatDateDMY(toDate)})
+              {tr("Per-Loom Breakdown", "ஒவ்வொரு தறியின் விவரம்")} ({formatDateDMY(fromDate)} – {formatDateDMY(toDate)})
             </h2>
             <table className="w-full text-xs text-left">
               <thead className="border-b border-slate-200 text-slate-500">
                 <tr>
-                  <th className="py-2 pr-3">Shuttle Loom</th>
-                  <th className="py-2 pr-3">Fabric Sort</th>
-                  <th className="py-2 pr-3">Shifts</th>
-                  <th className="py-2 pr-3">Woven</th>
-                  <th className="py-2 pr-3">Target Speed (m)</th>
-                  <th className="py-2 pr-3">Time Run %</th>
-                  <th className="py-2 pr-3">Speed %</th>
-                  <th className="py-2">Efficiency %</th>
+                  <th className="py-2 pr-3">{tr("Shuttle Loom", "தறி")}</th>
+                  <th className="py-2 pr-3">{tr("Fabric Sort", "துணி வகை")}</th>
+                  <th className="py-2 pr-3">{tr("Shifts", "ஷிப்டுகள்")}</th>
+                  <th className="py-2 pr-3">{tr("Woven", "நெய்தது")}</th>
+                  <th className="py-2 pr-3">{tr("Target Speed (m)", "இலக்கு (மீ)")}</th>
+                  <th className="py-2 pr-3">{tr("Time Run %", "நேரம் %")}</th>
+                  <th className="py-2 pr-3">{tr("Speed %", "வேகம் %")}</th>
+                  <th className="py-2">{tr("Efficiency %", "திறன் %")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -378,7 +398,7 @@ export function DashboardPage() {
                       {row.loom_number}{" "}
                       <span className="text-slate-400 font-normal">({row.rated_rpm} RPM)</span>
                     </td>
-                    <td className="py-1.5 pr-3">{row.sort_name ?? "No beam assigned"}</td>
+                    <td className="py-1.5 pr-3">{row.sort_name ?? tr("No beam assigned", "பீம் இல்லை")}</td>
                     <td className="py-1.5 pr-3">{row.shifts_logged}</td>
                     <td className="py-1.5 pr-3 font-semibold">{row.net_metres} m</td>
                     <td className="py-1.5 pr-3">{row.ideal_metres ? `${row.ideal_metres} m` : "-"}</td>

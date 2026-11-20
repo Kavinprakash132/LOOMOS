@@ -72,11 +72,13 @@ export function SetupPage() {
     const parsed: HistoricalEbSeedRow[] = [];
     for (const cols of rows.slice(1)) {
       if (cols.length < 4 || !cols[0]) continue;
+      const billNum = parseFloat(cols[3]);
+      if (!Number.isFinite(billNum) || billNum < 0) continue;
       parsed.push({
         period_start: cols[0],
         period_end: cols[1],
         units_consumed: cols[2],
-        net_bill_paise: Math.round(parseFloat(cols[3]) * 100),
+        net_bill_paise: Math.round(billNum * 100),
         total_power_cut_mins: cols[4] ? parseInt(cols[4], 10) || 0 : 0,
         notes: cols[5] ?? undefined,
       });
@@ -92,13 +94,15 @@ export function SetupPage() {
     const parsed: HistoricalDeliverySeedRow[] = [];
     for (const cols of rows.slice(1)) {
       if (cols.length < 6 || !cols[0]) continue;
+      const rateNum = parseFloat(cols[5]);
+      if (!Number.isFinite(rateNum) || rateNum <= 0) continue;
       parsed.push({
         delivery_date: cols[0],
         trader_name: cols[1],
         challan_no: cols[2],
         sort_name: cols[3] || undefined,
         metres: cols[4],
-        applied_rate_paise: Math.round(parseFloat(cols[5]) * 100),
+        applied_rate_paise: Math.round(rateNum * 100),
       });
     }
     setDelCsvRows(parsed);

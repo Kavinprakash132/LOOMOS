@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { ChevronDown, ChevronRight, GraduationCap } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 
 export function TechnicalDetailsToggle({
   title,
@@ -12,6 +13,7 @@ export function TechnicalDetailsToggle({
   defaultOpen?: boolean;
   children: React.ReactNode;
 }) {
+  const { tr } = useAuth();
   const [open, setOpen] = useState(defaultOpen);
 
   return (
@@ -29,7 +31,7 @@ export function TechnicalDetailsToggle({
           </div>
         </div>
         <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 shrink-0">
-          {open ? "Hide" : "Show"}
+          {open ? tr("Hide", "மறை") : tr("Show", "காட்டு")}
           {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
         </span>
       </button>

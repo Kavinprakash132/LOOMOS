@@ -21,7 +21,7 @@ import {
 type TabId = "looms" | "weavers" | "traders_sorts" | "eb_stops" | "team";
 
 export function SettingsMastersPage() {
-  const { t, refreshState } = useAuth();
+  const { t, tr, refreshState } = useAuth();
   const [tab, setTab] = useState<TabId>("looms");
   const [error, setError] = useState<string | null>(null);
   const [looms, setLooms] = useState<Loom[]>([]);
@@ -80,10 +80,13 @@ export function SettingsMastersPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-bold text-slate-900">Shed Setup &amp; Masters</h1>
+      <h1 className="text-xl font-bold text-slate-900">{tr("Shed Setup & Masters", "ஆலை அமைப்புகள் & மாஸ்டர்கள்")}</h1>
 
       <PageGuideBanner
-        tip="Set up your shuttle looms, workers & wage rates, traders & cloth sorts, TNPDCL electricity slabs, and CSV historical imports here."
+        tip={tr(
+          "Set up your shuttle looms, workers & wage rates, traders & cloth sorts, TNPDCL electricity slabs, and CSV historical imports here.",
+          "உங்கள் தறிகள், தொழிலாளர்கள் & கூலி விகிதங்கள், வியாபாரிகள், துணி வகைகள் மற்றும் மின் கட்டண அட்டவணையை இங்கே அமைக்கவும்."
+        )}
       />
 
       {error && (

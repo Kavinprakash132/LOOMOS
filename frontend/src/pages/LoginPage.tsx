@@ -48,7 +48,9 @@ export function LoginPage() {
           <div className="flex items-center gap-3">
             <Factory className="w-7 h-7 text-amber-400" />
             <div>
-              <h1 className="font-bold text-lg">{setupStatus?.unit_name ?? t("appTitle")}</h1>
+              <h1 className="font-bold text-lg">
+                {setupStatus?.unit_name && setupStatus.unit_name !== "LOOMOS" ? setupStatus.unit_name : t("appTitle")}
+              </h1>
               <p className="text-xs text-slate-300">{t("loginTitle")}</p>
             </div>
           </div>

@@ -5,14 +5,14 @@ from __future__ import annotations
 from pathlib import Path
 import os
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
 from app.core.config import BACKEND_ROOT, get_settings
-from app.core.database import Base, engine
+from app.core.database import engine
 from app.core.i18n import get_translations
 from app.routers import analytics, auth, beams, dashboard, data_ops, finance, inspections, masters, payroll, settings as settings_router, setup, shifts
 
@@ -33,6 +33,20 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.middleware("http")
+    async def add_security_and_cache_headers(request: Request, call_next):
+        response = await call_next(request)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        response.headers.setdefault("Permissions-Policy", "camera=(self), microphone=(), geolocation=()")
+        path = request.url.path
+        if path.startswith("/assets/"):
+            response.headers.setdefault("Cache-Control", "public, max-age=31536000, immutable")
+        elif not path.startswith("/api/"):
+            response.headers.setdefault("Cache-Control", "no-cache")
+        return response
 
     app.include_router(setup.router)
     app.include_router(auth.router)

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { HelpCircle, X } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 
 const STORAGE_KEY = "loomos_hide_page_guides";
 
@@ -10,6 +11,7 @@ export function PageGuideBanner({
   steps?: string[];
   tip?: string;
 }) {
+  const { tr } = useAuth();
   const [hidden, setHidden] = useState<boolean>(() => {
     try {
       return localStorage.getItem(STORAGE_KEY) === "1";
@@ -49,7 +51,7 @@ export function PageGuideBanner({
           className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-800 cursor-pointer"
         >
           <HelpCircle className="w-3.5 h-3.5" />
-          Show simple guide
+          {tr("Show simple guide", "எளிய வழிகாட்டியைக் காட்டு")}
         </button>
       </div>
     );
@@ -79,10 +81,10 @@ export function PageGuideBanner({
         type="button"
         onClick={() => toggle(true)}
         className="text-sky-700 hover:text-sky-950 inline-flex items-center gap-0.5 shrink-0 font-semibold cursor-pointer"
-        title="Hide helper tips on all pages"
+        title={tr("Hide helper tips on all pages", "எல்லா பக்கங்களிலும் குறிப்புகளை மறை")}
       >
         <X className="w-3.5 h-3.5" />
-        <span className="hidden sm:inline">Hide tips</span>
+        <span className="hidden sm:inline">{tr("Hide tips", "மறை")}</span>
       </button>
     </div>
   );

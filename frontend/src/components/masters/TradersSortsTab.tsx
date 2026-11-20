@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { apiRequest, formatRupeesFromPaise } from "../../api/client";
+import { useAuth } from "../../context/AuthContext";
 import { FabricSort, Trader } from "../../types/api";
 
 export function TradersSortsTab({
@@ -13,6 +14,7 @@ export function TradersSortsTab({
   onRefresh: () => Promise<void>;
   onError: (msg: string) => void;
 }) {
+  const { tr } = useAuth();
   const [companyName, setCompanyName] = useState("");
   const [contactName, setContactName] = useState("");
   const [phone, setPhone] = useState("");
@@ -46,6 +48,11 @@ export function TradersSortsTab({
 
   const addSort = async (e: React.FormEvent) => {
     e.preventDefault();
+    const ratePaise = Math.round(parseFloat(rateRs) * 100);
+    if (!Number.isFinite(ratePaise) || ratePaise <= 0) {
+      onError(tr("Enter a valid positive rate (₹/m).", "சரியான மீட்டர் விகிதத்தை உள்ளிடவும் (₹/மீ)."));
+      return;
+    }
     try {
       await apiRequest("/fabric-sorts", {
         method: "POST",
@@ -54,7 +61,7 @@ export function TradersSortsTab({
           reed,
           pick,
           width_in: widthIn,
-          agreed_rate_paise: Math.round(parseFloat(rateRs) * 100),
+          agreed_rate_paise: ratePaise,
           expected_weft_kg_per_100m: weftKgPer100m,
           wastage_pct: wastagePct,
         }),
@@ -89,11 +96,11 @@ export function TradersSortsTab({
       {/* Traders */}
       <div className="space-y-3">
         <form onSubmit={addTrader} className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
-          <h3 className="text-sm font-bold">Job-Work Traders (Parties Who Give Beams &amp; Pay Per Metre)</h3>
+          <h3 className="text-sm font-bold">{tr("Job-Work Traders (Parties Who Give Beams & Pay Per Metre)", "வியாபாரிகள் (பீம் கொடுத்து மீட்டர் கூலி தருபவர்கள்)")}</h3>
           <div className="grid sm:grid-cols-3 gap-2">
             <div>
               <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                Trader / Company Name <span className="text-rose-600">*</span>
+                {tr("Trader / Company Name", "வியாபாரி / நிறுவனப் பெயர்")} <span className="text-rose-600">*</span>
               </label>
               <input
                 required
@@ -104,7 +111,7 @@ export function TradersSortsTab({
               />
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-slate-600 mb-1">Contact Person (optional)</label>
+              <label className="block text-[11px] font-semibold text-slate-600 mb-1">{tr("Contact Person (optional)", "தொடர்பாளர் (விருப்பம்)")}</label>
               <input
                 placeholder="e.g. Kumar"
                 value={contactName}
@@ -113,7 +120,7 @@ export function TradersSortsTab({
               />
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-slate-600 mb-1">Phone Number (optional)</label>
+              <label className="block text-[11px] font-semibold text-slate-600 mb-1">{tr("Phone Number (optional)", "தொலைபேசி (விருப்பம்)")}</label>
               <input
                 placeholder="e.g. 9876543210"
                 value={phone}
@@ -123,17 +130,17 @@ export function TradersSortsTab({
             </div>
           </div>
           <button type="submit" className="px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold">
-            Add Trader
+            {tr("Add Trader", "வியாபாரி சேர்")}
           </button>
         </form>
         <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
-          {traders.map((tr) => (
-            <div key={tr.id} className="px-4 py-2.5 flex justify-between text-sm">
+          {traders.map((item) => (
+            <div key={item.id} className="px-4 py-2.5 flex justify-between text-sm">
               <div>
-                <span className="font-semibold">{tr.company_name}</span>
-                {tr.contact_name && <span className="ml-2 text-xs text-slate-500">({tr.contact_name})</span>}
+                <span className="font-semibold">{item.company_name}</span>
+                {item.contact_name && <span className="ml-2 text-xs text-slate-500">({item.contact_name})</span>}
               </div>
-              <span className="text-xs text-slate-500">{tr.phone || "—"}</span>
+              <span className="text-xs text-slate-500">{item.phone || "—"}</span>
             </div>
           ))}
         </div>
@@ -142,11 +149,11 @@ export function TradersSortsTab({
       {/* Fabric Sorts */}
       <div className="space-y-3">
         <form onSubmit={addSort} className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
-          <h3 className="text-sm font-bold">Fabric Sorts (Used for Rate Checker, Speed Target &amp; Weft Wastage)</h3>
+          <h3 className="text-sm font-bold">{tr("Fabric Sorts (Used for Rate Checker, Speed Target & Weft Wastage)", "துணி வகைகள் (விலை சரிபார்ப்பு & நூல் வீண் கணக்கு)")}</h3>
           <div className="grid sm:grid-cols-4 gap-2">
             <div className="sm:col-span-2">
               <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                Fabric Sort Name <span className="text-rose-600">*</span>
+                {tr("Fabric Sort Name", "துணி வகைப் பெயர்")} <span className="text-rose-600">*</span>
               </label>
               <input
                 required
@@ -158,7 +165,7 @@ export function TradersSortsTab({
             </div>
             <div>
               <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                Reed <span className="text-rose-600">*</span>
+                {tr("Reed", "ரீட்")} <span className="text-rose-600">*</span>
               </label>
               <input
                 type="number"
@@ -171,7 +178,7 @@ export function TradersSortsTab({
             </div>
             <div>
               <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                Pick (PPI) <span className="text-rose-600">*</span>
+                {tr("Pick (PPI)", "பிக் (PPI)")} <span className="text-rose-600">*</span>
               </label>
               <input
                 type="number"
@@ -185,7 +192,7 @@ export function TradersSortsTab({
           </div>
           <div className="grid sm:grid-cols-4 gap-2">
             <div>
-              <label className="block text-[11px] font-semibold text-slate-600 mb-1">Cloth Width (inches)</label>
+              <label className="block text-[11px] font-semibold text-slate-600 mb-1">{tr("Cloth Width (inches)", "துணி அகலம் (இன்ச்)")}</label>
               <input
                 type="number"
                 step="0.01"
@@ -196,7 +203,7 @@ export function TradersSortsTab({
               />
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-slate-600 mb-1">Agreed Rate (₹/metre)</label>
+              <label className="block text-[11px] font-semibold text-slate-600 mb-1">{tr("Agreed Rate (₹/metre)", "ஒப்பந்த விலை (₹/மீ)")}</label>
               <input
                 type="number"
                 step="0.01"
@@ -207,7 +214,7 @@ export function TradersSortsTab({
               />
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-slate-600 mb-1">Expected Weft kg / 100m</label>
+              <label className="block text-[11px] font-semibold text-slate-600 mb-1">{tr("Expected Weft kg / 100m", "ஊடை எடை (கிலோ/100மீ)")}</label>
               <input
                 type="number"
                 step="0.001"
@@ -218,7 +225,7 @@ export function TradersSortsTab({
               />
             </div>
             <div>
-              <label className="block text-[11px] font-semibold text-slate-600 mb-1">Allowed Wastage (%)</label>
+              <label className="block text-[11px] font-semibold text-slate-600 mb-1">{tr("Allowed Wastage (%)", "அனுமதி வீண் (%)")}</label>
               <input
                 type="number"
                 step="0.01"
@@ -231,7 +238,7 @@ export function TradersSortsTab({
             </div>
           </div>
           <button type="submit" className="px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold">
-            Add Fabric Sort
+            {tr("Add Fabric Sort", "துணி வகை சேர்")}
           </button>
         </form>
 
@@ -239,12 +246,12 @@ export function TradersSortsTab({
           <table className="min-w-full text-xs">
             <thead className="bg-slate-100 text-slate-700 font-semibold">
               <tr>
-                <th className="px-3 py-2 text-left">Sort</th>
-                <th className="px-3 py-2 text-left">Reed × Pick</th>
-                <th className="px-3 py-2 text-left">Agreed Rate</th>
-                <th className="px-3 py-2 text-left">Weft kg/100m</th>
-                <th className="px-3 py-2 text-left">Wastage %</th>
-                <th className="px-3 py-2 text-left">Action</th>
+                <th className="px-3 py-2 text-left">{tr("Sort", "துணி வகை")}</th>
+                <th className="px-3 py-2 text-left">{tr("Reed × Pick", "ரீட் × பிக்")}</th>
+                <th className="px-3 py-2 text-left">{tr("Agreed Rate", "ஒப்பந்த விலை")}</th>
+                <th className="px-3 py-2 text-left">{tr("Weft kg/100m", "ஊடை/100மீ")}</th>
+                <th className="px-3 py-2 text-left">{tr("Wastage %", "வீண் %")}</th>
+                <th className="px-3 py-2 text-left">{tr("Action", "செயல்")}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -268,14 +275,14 @@ export function TradersSortsTab({
                           onClick={() => void saveEditedSortRate(s.id)}
                           className="px-2 py-0.5 rounded bg-slate-900 text-white text-[11px]"
                         >
-                          Save
+                          {tr("Save", "சேமி")}
                         </button>
                         <button
                           type="button"
                           onClick={() => setEditingSortId(null)}
                           className="text-slate-500 text-[11px]"
                         >
-                          Cancel
+                          {tr("Cancel", "ரத்து")}
                         </button>
                       </div>
                     ) : (
@@ -294,7 +301,7 @@ export function TradersSortsTab({
                         }}
                         className="text-amber-700 font-semibold hover:underline cursor-pointer"
                       >
-                        Edit Rate
+                        {tr("Edit Rate", "விலை மாற்று")}
                       </button>
                     )}
                   </td>

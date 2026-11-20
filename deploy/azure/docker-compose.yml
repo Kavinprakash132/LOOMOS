@@ -7,6 +7,7 @@ services:
     restart: unless-stopped
     environment:
       - PORT=8000
+      - TZ=Asia/Kolkata
       - LOOMOS_DB_PATH=/data/loomos.db
       - LOOMOS_UPLOAD_DIR=/data/uploads
       - LOOMOS_BACKUP_DIR=/data/backups

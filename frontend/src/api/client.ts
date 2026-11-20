@@ -50,6 +50,10 @@ export async function apiRequest<T>(
     } catch {
       // Fallback to status text
     }
+    if (res.status === 401 && token && !path.startsWith("/auth/login")) {
+      setStoredToken(null);
+      window.dispatchEvent(new Event("loomos:unauthorized"));
+    }
     throw new ApiError(res.status, detail);
   }
 
@@ -120,7 +124,18 @@ export async function downloadProtectedFile(path: string, fallbackFilename: stri
 
   const res = await fetch(`/api/v1${path}`, { headers });
   if (!res.ok) {
-    throw new ApiError(res.status, `Download failed (${res.status})`);
+    let detail = `Download failed (${res.status})`;
+    try {
+      const errData = await res.json();
+      if (typeof errData?.detail === "string") detail = errData.detail;
+    } catch {
+      // keep default status text
+    }
+    if (res.status === 401 && token) {
+      setStoredToken(null);
+      window.dispatchEvent(new Event("loomos:unauthorized"));
+    }
+    throw new ApiError(res.status, detail);
   }
   const blob = await res.blob();
   const disp = res.headers.get("Content-Disposition") ?? "";

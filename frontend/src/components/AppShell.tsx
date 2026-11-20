@@ -49,27 +49,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     const raw: MainSection[] = [
       {
         id: "daily",
-        title: "Daily Shed",
+        title: t("secDaily"),
         icon: Factory,
         items: [
-          { to: "/dashboard", label: "Home", shortLabel: "Home", icon: BarChart3, matchPath: "/dashboard" },
-          { to: "/today", label: "Today's Production", shortLabel: "Production", icon: ClipboardCheck, matchPath: "/today" },
-          { to: "/beams", label: "Beams & Yarn", shortLabel: "Beams", icon: Layers, matchPath: "/beams" },
-          { to: "/inspect", label: "Check Cloth Photo", shortLabel: "Cloth AI", icon: Camera, matchPath: "/inspect" },
+          { to: "/dashboard", label: t("navHome"), shortLabel: t("navHomeShort"), icon: BarChart3, matchPath: "/dashboard" },
+          { to: "/today", label: t("navToday"), shortLabel: t("navTodayShort"), icon: ClipboardCheck, matchPath: "/today" },
+          { to: "/beams", label: t("navBeams"), shortLabel: t("navBeamsShort"), icon: Layers, matchPath: "/beams" },
+          { to: "/inspect", label: t("navInspect"), shortLabel: t("navInspectShort"), icon: Camera, matchPath: "/inspect" },
         ],
       },
       {
         id: "money",
-        title: "Money & Bills",
+        title: t("secMoney"),
         icon: Wallet,
         ownerOnly: true,
         items: [
-          { to: "/payroll", label: "Worker Wages", shortLabel: "Wages", icon: Wallet, ownerOnly: true, matchPath: "/payroll" },
-          { to: "/deliveries", label: "Deliveries & EB", shortLabel: "Deliveries", icon: Truck, ownerOnly: true, matchPath: "/deliveries" },
+          { to: "/payroll", label: t("navPayroll"), shortLabel: t("navPayrollShort"), icon: Wallet, ownerOnly: true, matchPath: "/payroll" },
+          { to: "/deliveries", label: t("navDeliveries"), shortLabel: t("navDeliveriesShort"), icon: Truck, ownerOnly: true, matchPath: "/deliveries" },
           {
             to: "/analytics?tab=reports",
-            label: "Excel & Statements",
-            shortLabel: "Reports",
+            label: t("navReports"),
+            shortLabel: t("navReportsShort"),
             icon: FileSpreadsheet,
             ownerOnly: true,
             matchPath: "/analytics",
@@ -79,36 +79,36 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       },
       {
         id: "tools",
-        title: "Smart Tools",
+        title: t("secTools"),
         icon: Sparkles,
         items: [
           {
             to: "/analytics?tab=eb",
-            label: "EB Calculator & Power",
-            shortLabel: "EB Calc",
+            label: t("navEbCalc"),
+            shortLabel: t("navEbCalcShort"),
             icon: Zap,
             matchPath: "/analytics",
             matchTab: "eb",
           },
           {
             to: "/analytics?tab=forecast",
-            label: "Forecast & Beam ETA",
-            shortLabel: "Forecast",
+            label: t("navForecast"),
+            shortLabel: t("navForecastShort"),
             icon: TrendingUp,
             matchPath: "/analytics",
             matchTab: "forecast",
           },
           {
             to: "/analytics?tab=simulator",
-            label: "Expansion Planner",
-            shortLabel: "Expansion",
+            label: t("navExpansion"),
+            shortLabel: t("navExpansionShort"),
             icon: Calculator,
             ownerOnly: true,
             matchPath: "/analytics",
             matchTab: "simulator",
           },
-          { to: "/settings", label: "Shed Setup", shortLabel: "Setup", icon: Settings, ownerOnly: true, matchPath: "/settings" },
-          { to: "/audit-log", label: "Edit History", shortLabel: "History", icon: History, ownerOnly: true, matchPath: "/audit-log" },
+          { to: "/settings", label: t("navSettings"), shortLabel: t("navSettingsShort"), icon: Settings, ownerOnly: true, matchPath: "/settings" },
+          { to: "/audit-log", label: t("navAudit"), shortLabel: t("navAuditShort"), icon: History, ownerOnly: true, matchPath: "/audit-log" },
         ],
       },
     ];
@@ -120,7 +120,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         items: sec.items.filter((it) => !it.ownerOnly || isOwner),
       }))
       .filter((sec) => sec.items.length > 0);
-  }, [isOwner]);
+  }, [isOwner, t]);
 
   const currentTab = new URLSearchParams(location.search).get("tab") || "forecast";
 
@@ -213,7 +213,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="p-4 border-t border-slate-800 space-y-2.5">
           <div className="flex items-center justify-between text-xs text-slate-300">
             <span className="truncate font-medium">
-              {user?.full_name} ({user?.role})
+              {user?.full_name} ({user?.role ? t(`role_${user.role}`) : ""})
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -240,7 +240,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <header className="md:hidden sticky top-0 z-20 bg-slate-900 text-white px-4 py-3 flex items-center justify-between shadow no-print">
         <div className="flex items-center gap-2 min-w-0">
           <Factory className="w-5 h-5 text-amber-400 shrink-0" />
-          <span className="font-bold text-base truncate">{setupStatus?.unit_name ?? t("appTitle")}</span>
+          <span className="font-bold text-base truncate">
+            {setupStatus?.unit_name && setupStatus.unit_name !== "LOOMOS" ? setupStatus.unit_name : t("appTitle")}
+          </span>
         </div>
         <div className="flex items-center gap-2">
           <button

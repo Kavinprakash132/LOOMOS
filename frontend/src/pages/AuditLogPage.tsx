@@ -79,7 +79,7 @@ function formatReadableAuditValues(rawJson: string | null): string[] {
 }
 
 export function AuditLogPage() {
-  const { t } = useAuth();
+  const { t, tr } = useAuth();
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
   const [entityFilter, setEntityFilter] = useState("");
   const [loading, setLoading] = useState(true);
@@ -104,7 +104,10 @@ export function AuditLogPage() {
         <div>
           <h1 className="text-xl font-bold text-slate-900">{t("auditTitle")}</h1>
           <p className="text-xs text-slate-500">
-            Plain record of every change, rate edit, or removal — showing who changed what and why.
+            {tr(
+              "Plain record of every change, rate edit, or removal — showing who changed what and why.",
+              "ஒவ்வொரு மாற்றம், விலை திருத்தம் மற்றும் நீக்கலின் முழுமையான பதிவு."
+            )}
           </p>
         </div>
         <select
@@ -112,47 +115,50 @@ export function AuditLogPage() {
           onChange={(e) => setEntityFilter(e.target.value)}
           className="px-3 py-2 rounded-lg border border-slate-300 bg-white text-sm"
         >
-          <option value="">All Records</option>
-          <option value="fabric_sort">Fabric Sorts &amp; Rates</option>
-          <option value="wage_rule">Wage Rules</option>
-          <option value="weaver">Workers</option>
-          <option value="shift_entry">Daily Shifts</option>
-          <option value="delivery">Deliveries</option>
-          <option value="trader_payment">Payments</option>
-          <option value="expense">Expenses</option>
-          <option value="eb_bill">EB Bills</option>
-          <option value="loom">Looms</option>
-          <option value="user">Users</option>
+          <option value="">{tr("All Records", "அனைத்து பதிவுகள்")}</option>
+          <option value="fabric_sort">{tr("Fabric Sorts & Rates", "துணி வகைகள் & விலை")}</option>
+          <option value="wage_rule">{tr("Wage Rules", "கூலி விதிகள்")}</option>
+          <option value="weaver">{tr("Workers", "தொழிலாளர்கள்")}</option>
+          <option value="shift_entry">{tr("Daily Shifts", "தினசரி ஷிப்ட்")}</option>
+          <option value="delivery">{tr("Deliveries", "டெலிவரி")}</option>
+          <option value="trader_payment">{tr("Payments", "வரவு பணம்")}</option>
+          <option value="expense">{tr("Expenses", "செலவுகள்")}</option>
+          <option value="eb_bill">{tr("EB Bills", "EB பில்கள்")}</option>
+          <option value="loom">{tr("Looms", "தறிகள்")}</option>
+          <option value="user">{tr("Users", "பயனர்கள்")}</option>
         </select>
       </div>
 
       <PageGuideBanner
-        tip="Every edit, rate change, or voided record is logged automatically here with Before and After values so nothing is ever silently lost."
+        tip={tr(
+          "Every edit, rate change, or voided record is logged automatically here with Before and After values so nothing is ever silently lost.",
+          "எந்தவொரு திருத்தமும் நீக்கலும் முன்பு மற்றும் பின்பு மதிப்புகளுடன் இங்கே தானாகப் பதிவாகும்."
+        )}
       />
 
       <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto shadow-sm">
         <table className="min-w-full text-xs">
           <thead className="bg-slate-100 text-slate-700 font-semibold">
             <tr>
-              <th className="px-3 py-2.5 text-left">When (IST)</th>
-              <th className="px-3 py-2.5 text-left">Record</th>
-              <th className="px-3 py-2.5 text-left">Action</th>
-              <th className="px-3 py-2.5 text-left">Before</th>
-              <th className="px-3 py-2.5 text-left">After</th>
-              <th className="px-3 py-2.5 text-left">Reason / Note</th>
+              <th className="px-3 py-2.5 text-left">{tr("When (IST)", "நேரம் (IST)")}</th>
+              <th className="px-3 py-2.5 text-left">{tr("Record", "பதிவு")}</th>
+              <th className="px-3 py-2.5 text-left">{tr("Action", "செயல்")}</th>
+              <th className="px-3 py-2.5 text-left">{tr("Before", "முன்பு")}</th>
+              <th className="px-3 py-2.5 text-left">{tr("After", "பின்பு")}</th>
+              <th className="px-3 py-2.5 text-left">{tr("Reason / Note", "காரணம் / குறிப்பு")}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {loading ? (
               <tr>
                 <td colSpan={6} className="px-4 py-6 text-center text-slate-500">
-                  Loading change history...
+                  {tr("Loading change history...", "மாற்றப் பதிவு ஏற்றப்படுகிறது...")}
                 </td>
               </tr>
             ) : logs.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-4 py-6 text-center text-slate-500">
-                  No records yet.
+                  {tr("No records yet.", "இன்னும் பதிவுகள் இல்லை.")}
                 </td>
               </tr>
             ) : (

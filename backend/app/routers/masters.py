@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.audit import record_audit, snapshot_fields, soft_delete_record
+from app.core.config import today_ist
 from app.core.database import get_db
 from app.core.security import get_current_user, require_owner
 from app.models.core import AuditLog, BeamLoading, FabricSort, Inspection, Loom, ShiftEntry, Trader, User, WageRule, Weaver
@@ -228,18 +229,23 @@ def delete_or_archive_loom(
 @router.get("/weavers", response_model=list[WeaverResponse])
 def list_weavers(
     active_only: bool = True,
-    _user: Annotated[User, Depends(get_current_user)] = None,  # type: ignore[assignment]
+    user: Annotated[User, Depends(get_current_user)] = None,  # type: ignore[assignment]
     db: Annotated[Session, Depends(get_db)] = None,  # type: ignore[assignment]
 ) -> list[WeaverResponse]:
     stmt = select(Weaver).options(selectinload(Weaver.wage_rules)).order_by(Weaver.full_name)
     if active_only:
         stmt = stmt.where(Weaver.is_active.is_(True))
     weavers = db.scalars(stmt).all()
+    is_owner = user.role == "OWNER"
     out: list[WeaverResponse] = []
     for w in weavers:
-        active_rules = [r for r in w.wage_rules if not r.is_deleted]
         resp = WeaverResponse.model_validate(w)
-        resp.wage_rules = [WageRuleResponse.model_validate(r) for r in active_rules]
+        if is_owner:
+            active_rules = [r for r in w.wage_rules if not r.is_deleted]
+            resp.wage_rules = [WageRuleResponse.model_validate(r) for r in active_rules]
+        else:
+            # Supervisors only need worker names/roles for shift entry; never expose private salaries
+            resp.wage_rules = []
         out.append(resp)
     return out
 
@@ -261,7 +267,7 @@ def create_weaver(
     )
     db.add(weaver)
     db.flush()
-    eff_from = payload.effective_from or date.today()
+    eff_from = payload.effective_from or today_ist()
     rule = WageRule(
         weaver_id=weaver.id,
         wage_mode=payload.wage_mode,
@@ -525,13 +531,20 @@ def update_fabric_sort(
     sort_obj = db.get(FabricSort, sort_id)
     if not sort_obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fabric sort not found")
+    updates = payload.model_dump(exclude_unset=True)
+    if "sort_name" in updates and updates["sort_name"] is not None:
+        dup = db.scalar(
+            select(FabricSort.id).where(FabricSort.sort_name == updates["sort_name"].strip(), FabricSort.id != sort_id)
+        )
+        if dup:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Fabric sort name already exists")
     _apply_audited_update(
         db,
         obj=sort_obj,
         entity_type="fabric_sort",
         entity_id=sort_obj.id,
         user_id=owner.id,
-        updates=payload.model_dump(exclude_unset=True),
+        updates=updates,
         fields=[
             "sort_name",
             "warp_count",

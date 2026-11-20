@@ -15,6 +15,7 @@ from openpyxl.styles import Font, PatternFill
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from app.core.config import today_ist
 from app.models.core import (
     Beam,
     BeamLoading,
@@ -77,7 +78,7 @@ def compute_beam_etas(db: Session) -> list[dict[str, Any]]:
     if not beams:
         return []
 
-    today = date.today()
+    today = today_ist()
     since = today - timedelta(days=14)
     rows = db.execute(
         select(ShiftEntry.loom_id, ShiftEntry.entry_date, ShiftEntry.net_metres).where(
@@ -214,7 +215,7 @@ def compute_eb_prediction_and_outage_loss(db: Session) -> dict[str, Any]:
         tariff_name = "No active EB plan"
 
     # Quantify 30-day stoppage / outage loss
-    today = date.today()
+    today = today_ist()
     since30 = today - timedelta(days=29)
     shifts = db.scalars(
         select(ShiftEntry).where(
@@ -516,7 +517,7 @@ def calculate_custom_eb_bill(
 
 def compute_production_anomalies(db: Session) -> list[dict[str, Any]]:
     """Detect Physical Cap breaches and robust MAD/IQR low-output outliers in recent shifts."""
-    today = date.today()
+    today = today_ist()
     since30 = today - timedelta(days=29)
     shifts = db.scalars(
         select(ShiftEntry)
@@ -594,7 +595,7 @@ def compute_production_anomalies(db: Session) -> list[dict[str, Any]]:
 
 def compute_weekly_forecast(db: Session) -> dict[str, Any]:
     """5-week walk-forward weekly production forecast comparing CN-MA, Holt Linear, and Naive."""
-    today = date.today()
+    today = today_ist()
     # Build 5 consecutive 7-day buckets ending today
     buckets: list[dict[str, Any]] = []
     for w_idx in range(4, -1, -1):
@@ -953,7 +954,7 @@ def build_full_xlsx_workbook(db: Session) -> bytes:
             cell.fill = header_fill
             cell.font = header_font
 
-    today = date.today()
+    today = today_ist()
     month_start = today - timedelta(days=29)
     fin = compute_owner_financials(db, period_start=month_start, period_end=today)
     dash = compute_floor_dashboard(db, period_start=month_start, period_end=today)

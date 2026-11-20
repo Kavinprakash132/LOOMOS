@@ -1,7 +1,14 @@
 {$LOOMOS_DOMAIN::80} {
-    encode gzip
+    encode gzip zstd
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "camera=(self), microphone=(), geolocation=()"
+        -Server
+    }
     request_body {
-        max_size 25MB
+        max_size 20MB
     }
     reverse_proxy loomos:8000
 }

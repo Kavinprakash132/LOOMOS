@@ -130,14 +130,11 @@ def compute_beams_response_list(db: Session, beam_ids: list[int] | None = None) 
 
 
 def sync_weft_wastage_alert(db: Session, beam_id: int) -> None:
-    """Create or clear an open WEFT_WASTAGE alert whenever wastage crosses allowed_pct."""
+    """Create, update, or clear an open WEFT_WASTAGE alert whenever wastage crosses allowed_pct."""
     rows = compute_beams_response_list(db, beam_ids=[beam_id])
     if not rows:
         return
     info = rows[0]
-    if not info["wastage_flagged"]:
-        return
-
     tag = f"Beam {info['beam_no']}:"
     existing = db.scalar(
         select(Alert).where(
@@ -146,6 +143,11 @@ def sync_weft_wastage_alert(db: Session, beam_id: int) -> None:
             Alert.message.like(f"{tag}%"),
         )
     )
+    if not info["wastage_flagged"]:
+        if existing:
+            existing.status = "DISMISSED"
+            db.flush()
+        return
     msg = (
         f"{tag} weft wastage {info['actual_wastage_pct']}% exceeds sort limit {info['allowed_wastage_pct']}% "
         f"(consumed {info['weft_consumed_kg']} kg vs expected {info['expected_weft_kg']} kg)."

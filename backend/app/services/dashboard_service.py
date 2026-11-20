@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import date, timedelta
+from datetime import date, timezone
 from decimal import Decimal, ROUND_HALF_UP
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import IST_TZ, today_ist
 from app.models.core import (
     Alert,
     Beam,
@@ -33,9 +34,15 @@ def _pct(num: Decimal | float, den: Decimal | float) -> float | None:
     return round(float(num) * 100.0 / d, 2)
 
 
-def compute_floor_dashboard(db: Session, *, period_start: date, period_end: date) -> dict:
+def compute_floor_dashboard(
+    db: Session,
+    *,
+    period_start: date,
+    period_end: date,
+    include_financial_alerts: bool = False,
+) -> dict:
     """Compute Availability, Performance (RPM+Pick), A*P Utilization, and conditional OEE."""
-    today = date.today()
+    today = today_ist()
     looms = db.scalars(select(Loom).where(Loom.is_active.is_(True)).order_by(Loom.loom_number)).all()
     sorts = {s.id: s for s in db.scalars(select(FabricSort)).all()}
     beams = {b.id: b for b in db.scalars(select(Beam)).all()}
@@ -67,7 +74,10 @@ def compute_floor_dashboard(db: Session, *, period_start: date, period_end: date
     ).all()
     insp_defect_by_loom: dict[int, Decimal] = defaultdict(lambda: Decimal("0.00"))
     for ins in conf_insp:
-        d_local = ins.inspected_at.date()
+        ts = ins.inspected_at
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        d_local = ts.astimezone(IST_TZ).date()
         if period_start <= d_local <= period_end and ins.loom_id is not None:
             insp_defect_by_loom[ins.loom_id] += ins.defective_metres
 
@@ -184,9 +194,10 @@ def compute_floor_dashboard(db: Session, *, period_start: date, period_end: date
             "Cloth Quality % appears once damaged metres are logged in Daily Shift."
         )
 
-    open_alerts = db.scalars(
-        select(Alert).where(Alert.status == "OPEN").order_by(Alert.created_at.desc(), Alert.id.desc()).limit(25)
-    ).all()
+    alert_stmt = select(Alert).where(Alert.status == "OPEN")
+    if not include_financial_alerts:
+        alert_stmt = alert_stmt.where(Alert.alert_type.not_in({"RATE_UNDERPAYMENT", "EB_OVERCHARGE", "EB_BILL"}))
+    open_alerts = db.scalars(alert_stmt.order_by(Alert.created_at.desc(), Alert.id.desc()).limit(25)).all()
     running_beams_count = len([b for b in beams.values() if b.status == "RUNNING"])
     wastage_alerts_count = len([a for a in open_alerts if a.alert_type == "WEFT_WASTAGE"])
 

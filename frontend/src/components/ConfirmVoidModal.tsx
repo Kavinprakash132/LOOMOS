@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { AlertTriangle, X } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 
 interface ConfirmVoidModalProps {
   open: boolean;
@@ -23,6 +24,7 @@ export function ConfirmVoidModal({
   onCancel,
   onConfirm,
 }: ConfirmVoidModalProps) {
+  const { tr } = useAuth();
   const [reason, setReason] = useState(defaultReason);
   const [touched, setTouched] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -76,20 +78,23 @@ export function ConfirmVoidModal({
           {requireReason && (
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Reason (saved in Change History) <span className="text-rose-600">*</span>
+                {tr("Reason (saved in Change History)", "காரணம் (மாற்றப் பதிவில் சேமிக்கப்படும்)")}{" "}
+                <span className="text-rose-600">*</span>
               </label>
               <input
                 type="text"
                 autoFocus
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
-                placeholder="e.g. Entry mistake, duplicate entry"
+                placeholder={tr("e.g. Entry mistake, duplicate entry", "எ.கா. தவறான பதிவு, இரட்டைப் பதிவு")}
                 className={`w-full px-3 py-2 rounded-lg border text-sm ${
                   invalid ? "field-invalid" : "border-slate-300"
                 }`}
               />
               {invalid && (
-                <p className="mt-1 text-xs text-rose-600 font-medium">Enter at least 2 characters.</p>
+                <p className="mt-1 text-xs text-rose-600 font-medium">
+                  {tr("Enter at least 2 characters.", "குறைந்தது 2 எழுத்துகளை உள்ளிடவும்.")}
+                </p>
               )}
             </div>
           )}
@@ -101,14 +106,14 @@ export function ConfirmVoidModal({
               disabled={busy}
               className="px-3.5 py-2 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50"
             >
-              Cancel
+              {tr("Cancel", "ரத்து")}
             </button>
             <button
               type="submit"
               disabled={busy}
               className="px-4 py-2 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold disabled:opacity-50"
             >
-              {busy ? "Removing..." : confirmLabel}
+              {busy ? tr("Removing...", "நீக்கப்படுகிறது...") : confirmLabel}
             </button>
           </div>
         </form>

@@ -8,6 +8,7 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit, snapshot_fields
+from app.core.config import today_ist
 from app.models.core import (
     Delivery,
     DeliveryItem,
@@ -178,7 +179,7 @@ def import_historical_seed(
 
 def seed_optional_sample_data(db: Session, *, owner_id: int, tariff_plan: EbTariffPlan) -> None:
     """Seed clearly labelled synthetic demo masters/history only when requested by the user."""
-    today = date.today()
+    today = today_ist()
     trader = Trader(company_name="[DEMO] Sri Murugan Textiles", contact_name="Kumar", phone="9876543210", created_by=owner_id)
     db.add(trader)
     sort_obj = FabricSort(

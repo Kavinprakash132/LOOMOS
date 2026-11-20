@@ -11,6 +11,7 @@ import {
 } from "../api/client";
 import { ConfirmVoidModal } from "../components/ConfirmVoidModal";
 import { PageGuideBanner } from "../components/PageGuideBanner";
+import { useAuth } from "../context/AuthContext";
 import {
   Beam,
   DeliveryRecord,
@@ -42,6 +43,7 @@ function suggestNextChallanNo(existing: DeliveryRecord[]): string {
 }
 
 export function DeliveriesPage() {
+  const { tr } = useAuth();
   const [tab, setTab] = useState<TabId>("deliveries");
   const [traders, setTraders] = useState<Trader[]>([]);
   const [sorts, setSorts] = useState<FabricSort[]>([]);
@@ -54,6 +56,7 @@ export function DeliveriesPage() {
   const [ebBills, setEbBills] = useState<EbBillRecord[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [voidTarget, setVoidTarget] = useState<{ endpoint: string; label: string } | null>(null);
   const [showDeliveryForm, setShowDeliveryForm] = useState(false);
   const [showPaymentForm, setShowPaymentForm] = useState(false);
@@ -136,6 +139,12 @@ export function DeliveriesPage() {
 
   const submitDelivery = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
+    if (!Number.isFinite(appliedPaisePreview) || appliedPaisePreview <= 0) {
+      setError(tr("Enter a valid rate per metre.", "சரியான மீட்டர் விகிதத்தை உள்ளிடவும்."));
+      return;
+    }
+    setSubmitting(true);
     setError(null);
     setSuccess(null);
     try {
@@ -158,18 +167,31 @@ export function DeliveriesPage() {
       });
       setSuccess(
         res.has_rate_cut
-          ? `Challan saved — RATE CUT DETECTED: shortfall ${formatRupeesFromPaise(res.total_underpayment_paise)}!`
-          : "Delivery challan saved."
+          ? tr(
+              `Challan saved — RATE CUT DETECTED: shortfall ${formatRupeesFromPaise(res.total_underpayment_paise)}!`,
+              `சலான் சேமிக்கப்பட்டது — விலை குறைப்பு கண்டறியப்பட்டது: ${formatRupeesFromPaise(res.total_underpayment_paise)}!`
+            )
+          : tr("Delivery challan saved.", "டெலிவரி சலான் சேமிக்கப்பட்டது.")
       );
       setChallanNo(suggestNextChallanNo([res, ...deliveries]));
       await loadAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create delivery");
+      setError(err instanceof Error ? err.message : tr("Failed to create delivery", "டெலிவரியை சேமிக்க முடியவில்லை"));
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const submitPayment = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
+    const amtNum = parseFloat(payAmtRs);
+    const shortNum = parseFloat(payShortRs || "0");
+    if (!Number.isFinite(amtNum) || amtNum <= 0) {
+      setError(tr("Enter a valid payment amount.", "சரியான தொகையை உள்ளிடவும்."));
+      return;
+    }
+    setSubmitting(true);
     setError(null);
     try {
       await apiRequest("/payments", {
@@ -177,22 +199,31 @@ export function DeliveriesPage() {
         body: JSON.stringify({
           trader_id: payTraderId,
           payment_date: payDate,
-          amount_paise: Math.round(parseFloat(payAmtRs) * 100),
-          shortage_deduction_paise: Math.round(parseFloat(payShortRs || "0") * 100),
+          amount_paise: Math.round(amtNum * 100),
+          shortage_deduction_paise: Number.isFinite(shortNum) && shortNum > 0 ? Math.round(shortNum * 100) : 0,
           reference: payRef || null,
         }),
       });
       setPayAmtRs("");
       setPayRef("");
-      setSuccess("Trader payment recorded.");
+      setSuccess(tr("Trader payment recorded.", "வியாபாரி பணம் பதிவு செய்யப்பட்டது."));
       await loadAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save payment");
+      setError(err instanceof Error ? err.message : tr("Failed to save payment", "பணத்தை சேமிக்க முடியவில்லை"));
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const submitExpense = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
+    const expNum = parseFloat(expAmtRs);
+    if (!Number.isFinite(expNum) || expNum <= 0) {
+      setError(tr("Enter a valid expense amount.", "சரியான செலவு தொகையை உள்ளிடவும்."));
+      return;
+    }
+    setSubmitting(true);
     setError(null);
     try {
       await apiRequest("/expenses", {
@@ -200,21 +231,25 @@ export function DeliveriesPage() {
         body: JSON.stringify({
           expense_date: expDate,
           category: expCategory,
-          amount_paise: Math.round(parseFloat(expAmtRs) * 100),
+          amount_paise: Math.round(expNum * 100),
           note: expNote || null,
         }),
       });
       setExpAmtRs("");
       setExpNote("");
-      setSuccess("Expense saved.");
+      setSuccess(tr("Expense saved.", "செலவு சேமிக்கப்பட்டது."));
       await loadAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save expense");
+      setError(err instanceof Error ? err.message : tr("Failed to save expense", "செலவை சேமிக்க முடியவில்லை"));
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const submitEbReading = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
+    setSubmitting(true);
     setError(null);
     try {
       await apiRequest("/eb-readings", {
@@ -222,15 +257,24 @@ export function DeliveriesPage() {
         body: JSON.stringify({ reading_date: readDate, kwh_total: readKwh }),
       });
       setReadKwh("");
-      setSuccess("EB meter snapshot saved.");
+      setSuccess(tr("EB meter snapshot saved.", "EB மீட்டர் அளவு சேமிக்கப்பட்டது."));
       await loadAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save EB reading");
+      setError(err instanceof Error ? err.message : tr("Failed to save EB reading", "EB அளவை சேமிக்க முடியவில்லை"));
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const submitEbBill = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitting) return;
+    const netNum = parseFloat(billNetRs);
+    if (!Number.isFinite(netNum) || netNum < 0) {
+      setError(tr("Enter a valid net EB bill amount.", "சரியான EB பில் தொகையை உள்ளிடவும்."));
+      return;
+    }
+    setSubmitting(true);
     setError(null);
     try {
       await apiRequest("/eb-bills", {
@@ -239,16 +283,18 @@ export function DeliveriesPage() {
           period_start: billStart,
           period_end: billEnd,
           units_consumed: billUnits,
-          net_bill_paise: Math.round(parseFloat(billNetRs) * 100),
+          net_bill_paise: Math.round(netNum * 100),
           total_power_cut_mins: Number(billPowerCutMins || "0"),
         }),
       });
       setBillUnits("");
       setBillNetRs("");
-      setSuccess("EB bill saved and slab components reconciled.");
+      setSuccess(tr("EB bill saved and slab components reconciled.", "EB பில் சேமிக்கப்பட்டது."));
       await loadAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save EB bill");
+      setError(err instanceof Error ? err.message : tr("Failed to save EB bill", "EB பில்லை சேமிக்க முடியவில்லை"));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -288,19 +334,22 @@ export function DeliveriesPage() {
     <div className="space-y-5">
       <ConfirmVoidModal
         open={Boolean(voidTarget)}
-        title={`Void ${voidTarget?.label ?? ""}?`}
-        description="Removes this record from totals and stores it in Change History."
-        confirmLabel="Confirm Void"
+        title={tr(`Void ${voidTarget?.label ?? ""}?`, `${voidTarget?.label ?? ""} பதிவை நீக்கவா?`)}
+        description={tr("Removes this record from totals and stores it in Change History.", "இந்த பதிவு மொத்தக் கணக்கிலிருந்து நீக்கப்படும்; மாற்றப் பதிவில் வரலாறு இருக்கும்.")}
+        confirmLabel={tr("Confirm Void", "நீக்குதலை உறுதி செய்")}
         onCancel={() => setVoidTarget(null)}
         onConfirm={confirmSoftDelete}
       />
       <div>
         <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
           <Truck className="w-5 h-5 text-amber-600" />
-          Deliveries, Rate Checker, EB Ledger & Backups
+          {tr("Deliveries, Rate Checker, EB Ledger & Backups", "டெலிவரி, விலை சரிபார்ப்பு, EB கணக்கு & பேக்கப்")}
         </h1>
         <p className="text-xs text-slate-500">
-          Flags trader per-metre rate cuts automatically, tracks receivables, EB bills, and Excel-ready CSV/DB backups.
+          {tr(
+            "Flags trader per-metre rate cuts automatically, tracks receivables, EB bills, and Excel-ready CSV/DB backups.",
+            "வியாபாரி விலை குறைப்பை தானாகக் காட்டும்; பாக்கி, EB பில் மற்றும் CSV/DB பேக்கப் பதிவிறக்கலாம்."
+          )}
         </p>
       </div>
 
@@ -308,16 +357,19 @@ export function DeliveriesPage() {
       {success && <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm">{success}</div>}
 
       <PageGuideBanner
-        tip="Record cloth deliveries (auto-checks if a trader cuts your per-metre rate), log money received, track shed expenses, and save EB meter snapshots or bills."
+        tip={tr(
+          "Record cloth deliveries (auto-checks if a trader cuts your per-metre rate), log money received, track shed expenses, and save EB meter snapshots or bills.",
+          "துணி டெலிவரி (விலை குறைப்பை தானாகச் சரிபார்க்கும்), வரவு பணம், ஆலை செலவுகள் மற்றும் EB மீட்டர்/பில்களை இங்கே பதிவு செய்யவும்."
+        )}
       />
 
       <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-2">
         {[
-          { id: "deliveries", label: `Deliveries & Rate Check (${deliveries.length})` },
-          { id: "payments", label: "Trader Receivables & Payments" },
-          { id: "expenses", label: `Expenses (${expenses.length})` },
-          { id: "eb", label: `EB Readings & Bills (${ebBills.length})` },
-          { id: "exports", label: "CSV Exports & DB Backup" },
+          { id: "deliveries", label: tr(`Deliveries & Rate Check (${deliveries.length})`, `டெலிவரி & விலை சரிபார்ப்பு (${deliveries.length})`) },
+          { id: "payments", label: tr("Trader Receivables & Payments", "வியாபாரி பாக்கி & வரவு") },
+          { id: "expenses", label: tr(`Expenses (${expenses.length})`, `செலவுகள் (${expenses.length})`) },
+          { id: "eb", label: tr(`EB Readings & Bills (${ebBills.length})`, `EB ரீடிங் & பில்கள் (${ebBills.length})`) },
+          { id: "exports", label: tr("CSV Exports & DB Backup", "CSV & பேக்கப்") },
         ].map((item) => (
           <button
             key={item.id}
@@ -346,20 +398,23 @@ export function DeliveriesPage() {
               }`}
             >
               <Plus className="w-4 h-4" />
-              {showDeliveryForm ? "Close Challan Form" : "Add Delivery Challan"}
+              {showDeliveryForm ? tr("Close Challan Form", "சலான் படிவத்தை மூடு") : tr("Add Delivery Challan", "டெலிவரி சலான் சேர்")}
             </button>
           </div>
           {showDeliveryForm && (
           <form onSubmit={submitDelivery} className="bg-white p-4 rounded-xl border border-amber-300 shadow-sm space-y-3">
             <div>
-              <h2 className="text-sm font-bold">Record Cloth Delivery Challan (Rate Checker Active)</h2>
+              <h2 className="text-sm font-bold">{tr("Record Cloth Delivery Challan (Rate Checker Active)", "துணி டெலிவரி சலான் பதிவு (விலை சரிபார்ப்பு செயலில்)")}</h2>
               <p className="text-[11px] text-slate-500">
-                Challan No auto-fills next number (editable if copying a printed slip). Rate Checker compares Applied Rate vs Agreed Sort Rate and flags underpayments automatically.
+                {tr(
+                  "Challan No auto-fills next number (editable if copying a printed slip). Rate Checker compares Applied Rate vs Agreed Sort Rate and flags underpayments automatically.",
+                  "சலான் எண் தானாக வரும் (மாற்றலாம்). ஒப்புக்கொண்ட விலையை விடக் குறைவாகப் போட்டால் தானாக எச்சரிக்கும்."
+                )}
               </p>
             </div>
             <div className="grid sm:grid-cols-4 gap-2">
               <div>
-                <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Trader *</label>
+                <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Trader *", "வியாபாரி *")}</label>
                 <select
                   required
                   value={delTraderId}
@@ -374,7 +429,7 @@ export function DeliveriesPage() {
                 </select>
               </div>
               <div>
-                <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Challan No (Auto / Editable) *</label>
+                <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Challan No (Auto / Editable) *", "சலான் எண் *")}</label>
                 <input
                   required
                   placeholder="e.g. CH-203"
@@ -384,7 +439,7 @@ export function DeliveriesPage() {
                 />
               </div>
               <div>
-                <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Delivery Date *</label>
+                <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Delivery Date *", "டெலிவரி தேதி *")}</label>
                 <input
                   type="date"
                   required
@@ -394,13 +449,13 @@ export function DeliveriesPage() {
                 />
               </div>
               <div>
-                <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Warp Beam (optional)</label>
+                <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Warp Beam (optional)", "பீம் (விருப்பம்)")}</label>
                 <select
                   value={delBeamId}
                   onChange={(e) => setDelBeamId(e.target.value ? Number(e.target.value) : "")}
                   className="w-full px-3 py-2 rounded border border-slate-300 text-sm bg-white"
                 >
-                  <option value="">None / Unlinked</option>
+                  <option value="">{tr("None / Unlinked", "ஏதுமில்லை")}</option>
                   {beams.map((b) => (
                     <option key={b.id} value={b.id}>
                       {b.beam_no}
@@ -411,7 +466,7 @@ export function DeliveriesPage() {
             </div>
             <div className="grid sm:grid-cols-12 gap-2 items-end">
               <div className="sm:col-span-5">
-                <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Fabric Sort *</label>
+                <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Fabric Sort *", "துணி வகை *")}</label>
                 <select
                   required
                   value={delSortId}
@@ -425,13 +480,13 @@ export function DeliveriesPage() {
                 >
                   {sorts.map((s) => (
                     <option key={s.id} value={s.id}>
-                      {s.sort_name} (Agreed ₹{(s.agreed_rate_paise / 100).toFixed(2)})
+                      {s.sort_name} ({tr("Agreed", "ஒப்பந்தம்")} ₹{(s.agreed_rate_paise / 100).toFixed(2)})
                     </option>
                   ))}
                 </select>
               </div>
               <div className="sm:col-span-2">
-                <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Pieces (Taakas)</label>
+                <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Pieces (Taakas)", "தக்கா / பீஸ்")}</label>
                 <input
                   type="number"
                   min="1"
@@ -441,7 +496,7 @@ export function DeliveriesPage() {
                 />
               </div>
               <div className="sm:col-span-2">
-                <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Delivered Metres *</label>
+                <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Delivered Metres *", "டெலிவரி மீட்டர் *")}</label>
                 <input
                   type="number"
                   step="0.01"
@@ -453,7 +508,7 @@ export function DeliveriesPage() {
                 />
               </div>
               <div className="sm:col-span-3">
-                <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Applied Rate (₹/m) *</label>
+                <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Applied Rate (₹/m) *", "போட்ட விலை (₹/மீ) *")}</label>
                 <input
                   type="number"
                   step="0.01"
@@ -470,16 +525,14 @@ export function DeliveriesPage() {
             {hasInlineRateCut && selectedSort && (
               <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4 shrink-0" />
-                Rate cut warning: Applied ₹{delRateRs}/m is below agreed{" "}
-                {formatRupeesFromPaise(selectedSort.agreed_rate_paise)}/m (shortfall ≈{" "}
-                {formatRupeesFromPaise(
-                  Math.round((selectedSort.agreed_rate_paise - appliedPaisePreview) * parseFloat(delMetres || "0"))
+                {tr(
+                  `Rate cut warning: Applied ₹${delRateRs}/m is below agreed ${formatRupeesFromPaise(selectedSort.agreed_rate_paise)}/m (shortfall ≈ ${formatRupeesFromPaise(Math.round((selectedSort.agreed_rate_paise - appliedPaisePreview) * parseFloat(delMetres || "0")))}).`,
+                  `விலை குறைப்பு எச்சரிக்கை: ₹${delRateRs}/மீ என்பது ஒப்பந்த விலை ${formatRupeesFromPaise(selectedSort.agreed_rate_paise)}/மீ-ஐ விடக் குறைவு (இழப்பு ≈ ${formatRupeesFromPaise(Math.round((selectedSort.agreed_rate_paise - appliedPaisePreview) * parseFloat(delMetres || "0")))}).`
                 )}
-                ).
               </div>
             )}
-            <button type="submit" className="px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold cursor-pointer">
-              Save Delivery Challan
+            <button type="submit" disabled={submitting} className="px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold cursor-pointer disabled:opacity-50">
+              {tr("Save Delivery Challan", "டெலிவரி சலானை சேமி")}
             </button>
           </form>
           )}
@@ -497,7 +550,7 @@ export function DeliveriesPage() {
                   <b>{d.total_metres} m</b>
                   {d.has_rate_cut && (
                     <span className="ml-2 px-2 py-0.5 rounded bg-rose-100 text-rose-800 font-bold">
-                      RATE CUT: -{formatRupeesFromPaise(d.total_underpayment_paise)}
+                      {tr("RATE CUT", "விலை குறைப்பு")}: -{formatRupeesFromPaise(d.total_underpayment_paise)}
                     </span>
                   )}
                 </div>
@@ -508,7 +561,7 @@ export function DeliveriesPage() {
                     onClick={() => void softDeleteRecord(`/deliveries/${d.id}`, `Challan ${d.challan_no}`)}
                     className="text-rose-600 hover:underline inline-flex items-center gap-0.5"
                   >
-                    <Trash2 className="w-3.5 h-3.5" /> Void
+                    <Trash2 className="w-3.5 h-3.5" /> {tr("Void", "நீக்கு")}
                   </button>
                 </div>
               </div>
@@ -521,17 +574,17 @@ export function DeliveriesPage() {
       {tab === "payments" && (
         <div className="space-y-4">
           <div className="bg-white p-4 rounded-xl border border-slate-200 overflow-x-auto">
-            <h2 className="text-sm font-bold mb-2">Trader Receivables Ledger</h2>
+            <h2 className="text-sm font-bold mb-2">{tr("Trader Receivables Ledger", "வியாபாரி பாக்கி பேரேடு")}</h2>
             <table className="w-full text-xs text-left">
               <thead className="border-b border-slate-200 text-slate-500">
                 <tr>
-                  <th className="py-2 pr-3">Trader</th>
-                  <th className="py-2 pr-3">Metres</th>
-                  <th className="py-2 pr-3">Billed</th>
-                  <th className="py-2 pr-3">Received</th>
-                  <th className="py-2 pr-3">Shortage Ded.</th>
-                  <th className="py-2 pr-3">Rate-Cut Loss</th>
-                  <th className="py-2">Balance Due</th>
+                  <th className="py-2 pr-3">{tr("Trader", "வியாபாரி")}</th>
+                  <th className="py-2 pr-3">{tr("Metres", "மீட்டர்")}</th>
+                  <th className="py-2 pr-3">{tr("Billed", "பில் தொகை")}</th>
+                  <th className="py-2 pr-3">{tr("Received", "வந்தது")}</th>
+                  <th className="py-2 pr-3">{tr("Shortage Ded.", "குறைவு கழிவு")}</th>
+                  <th className="py-2 pr-3">{tr("Rate-Cut Loss", "விலை குறைப்பு")}</th>
+                  <th className="py-2">{tr("Balance Due", "மீதி பாக்கி")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -561,14 +614,14 @@ export function DeliveriesPage() {
               }`}
             >
               <Plus className="w-4 h-4" />
-              {showPaymentForm ? "Close Payment Form" : "Record Trader Payment"}
+              {showPaymentForm ? tr("Close Payment Form", "வரவு படிவத்தை மூடு") : tr("Record Trader Payment", "வியாபாரி வரவு பதிவு")}
             </button>
           </div>
 
           {showPaymentForm && (
           <form onSubmit={submitPayment} className="bg-white p-4 rounded-xl border border-amber-300 shadow-sm grid sm:grid-cols-5 gap-2 items-end">
             <div>
-              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Trader *</label>
+              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Trader *", "வியாபாரி *")}</label>
               <select
                 required
                 value={payTraderId}
@@ -583,23 +636,23 @@ export function DeliveriesPage() {
               </select>
             </div>
             <div>
-              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Payment Date *</label>
+              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Payment Date *", "வரவு தேதி *")}</label>
               <input type="date" required value={payDate} onChange={(e) => setPayDate(e.target.value)} className="w-full px-3 py-2 rounded border border-slate-300 text-sm" />
             </div>
             <div>
-              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Received Amount (₹) *</label>
+              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Received Amount (₹) *", "வந்த தொகை (₹) *")}</label>
               <input type="number" step="0.01" min="0.01" required placeholder="e.g. 5000" value={payAmtRs} onChange={(e) => setPayAmtRs(e.target.value)} className="w-full px-3 py-2 rounded border border-slate-300 text-sm" />
             </div>
             <div>
-              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Shortage Cut (₹, optional)</label>
+              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Shortage Cut (₹, optional)", "குறைவு கழிவு (₹)")}</label>
               <input type="number" step="0.01" min="0" placeholder="0" value={payShortRs} onChange={(e) => setPayShortRs(e.target.value)} className="w-full px-3 py-2 rounded border border-slate-300 text-sm" />
             </div>
             <div className="flex gap-2 items-end">
               <div className="w-full">
-                <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Reference (optional)</label>
+                <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Reference (optional)", "குறிப்பு (விருப்பம்)")}</label>
                 <input placeholder="NEFT / UPI" value={payRef} onChange={(e) => setPayRef(e.target.value)} className="w-full px-2.5 py-2 rounded border border-slate-300 text-sm" />
               </div>
-              <button type="submit" className="px-3.5 py-2 rounded bg-slate-900 text-white text-xs font-semibold shrink-0 cursor-pointer">Add</button>
+              <button type="submit" disabled={submitting} className="px-3.5 py-2 rounded bg-slate-900 text-white text-xs font-semibold shrink-0 cursor-pointer disabled:opacity-50">{tr("Add", "சேர்")}</button>
             </div>
           </form>
           )}
@@ -616,7 +669,7 @@ export function DeliveriesPage() {
                       onClick={() => void softDeleteRecord(`/payments/${p.id}`, `Payment #${p.id}`)}
                       className="text-rose-600 hover:underline inline-flex items-center gap-0.5"
                     >
-                      <Trash2 className="w-3.5 h-3.5" /> Void
+                      <Trash2 className="w-3.5 h-3.5" /> {tr("Void", "நீக்கு")}
                     </button>
                   </div>
                 </div>
@@ -640,29 +693,29 @@ export function DeliveriesPage() {
               }`}
             >
               <Plus className="w-4 h-4" />
-              {showExpenseForm ? "Close Expense Form" : "Add Shed Expense"}
+              {showExpenseForm ? tr("Close Expense Form", "செலவு படிவத்தை மூடு") : tr("Add Shed Expense", "ஆலை செலவு சேர்")}
             </button>
           </div>
           {showExpenseForm && (
           <form onSubmit={submitExpense} className="bg-white p-4 rounded-xl border border-amber-300 shadow-sm grid sm:grid-cols-4 gap-2 items-end">
             <div>
-              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Expense Date *</label>
+              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Expense Date *", "செலவு தேதி *")}</label>
               <input type="date" required value={expDate} onChange={(e) => setExpDate(e.target.value)} className="w-full px-3 py-2 rounded border border-slate-300 text-sm" />
             </div>
             <div>
-              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Category *</label>
-              <input required value={expCategory} onChange={(e) => setExpCategory(e.target.value)} placeholder="e.g. Loom Oil" className="w-full px-3 py-2 rounded border border-slate-300 text-sm" />
+              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Category *", "வகை *")}</label>
+              <input required value={expCategory} onChange={(e) => setExpCategory(e.target.value)} placeholder={tr("e.g. Loom Oil", "எ.கா. தறி எண்ணெய்")} className="w-full px-3 py-2 rounded border border-slate-300 text-sm" />
             </div>
             <div>
-              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Amount (₹) *</label>
+              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Amount (₹) *", "தொகை (₹) *")}</label>
               <input type="number" step="0.01" min="0.01" required value={expAmtRs} onChange={(e) => setExpAmtRs(e.target.value)} placeholder="e.g. 500" className="w-full px-3 py-2 rounded border border-slate-300 text-sm" />
             </div>
             <div className="flex gap-2 items-end">
               <div className="w-full">
-                <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Note (optional)</label>
-                <input value={expNote} onChange={(e) => setExpNote(e.target.value)} placeholder="Details" className="w-full px-2.5 py-2 rounded border border-slate-300 text-sm" />
+                <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Note (optional)", "குறிப்பு (விருப்பம்)")}</label>
+                <input value={expNote} onChange={(e) => setExpNote(e.target.value)} placeholder={tr("Details", "விவரம்")} className="w-full px-2.5 py-2 rounded border border-slate-300 text-sm" />
               </div>
-              <button type="submit" className="px-3.5 py-2 rounded bg-slate-900 text-white text-xs font-semibold shrink-0 cursor-pointer">Save</button>
+              <button type="submit" disabled={submitting} className="px-3.5 py-2 rounded bg-slate-900 text-white text-xs font-semibold shrink-0 cursor-pointer disabled:opacity-50">{tr("Save", "சேமி")}</button>
             </div>
           </form>
           )}
@@ -677,7 +730,7 @@ export function DeliveriesPage() {
                     onClick={() => void softDeleteRecord(`/expenses/${e.id}`, `Expense ${e.category}`)}
                     className="text-rose-600 hover:underline inline-flex items-center gap-0.5"
                   >
-                    <Trash2 className="w-3.5 h-3.5" /> Void
+                    <Trash2 className="w-3.5 h-3.5" /> {tr("Void", "நீக்கு")}
                   </button>
                 </div>
               </div>
@@ -691,31 +744,34 @@ export function DeliveriesPage() {
         <div className="space-y-4">
           <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-2 text-xs">
             <span className="text-amber-950 font-medium">
-              Want to verify a TNPDCL bill or estimate EB cost from fabric metres without saving?
+              {tr(
+                "Want to verify a TNPDCL bill or estimate EB cost from fabric metres without saving?",
+                "சேமிக்காமல் TNPDCL மின் கட்டணத்தை சரிபார்க்க அல்லது மீட்டருக்கு EB செலவைக் கணக்கிட வேண்டுமா?"
+              )}
             </span>
             <Link
               to="/analytics?tab=eb"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500 text-slate-950 font-bold hover:bg-amber-400"
             >
-              <Zap className="w-3.5 h-3.5" /> Open EB Bill Calculator →
+              <Zap className="w-3.5 h-3.5" /> {tr("Open EB Bill Calculator →", "EB கணக்கீட்டாளரைத் திற →")}
             </Link>
           </div>
           <div className="grid md:grid-cols-2 gap-4">
             <form onSubmit={submitEbReading} className="bg-white p-4 rounded-xl border border-slate-200 space-y-2.5">
               <h2 className="text-sm font-bold flex items-center gap-1.5">
-                <Zap className="w-4 h-4 text-amber-600" /> Log EB Meter Snapshot
+                <Zap className="w-4 h-4 text-amber-600" /> {tr("Log EB Meter Snapshot", "EB மீட்டர் ரீடிங் பதிவு")}
               </h2>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Reading Date *</label>
+                  <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Reading Date *", "ரீடிங் தேதி *")}</label>
                   <input type="date" required value={readDate} onChange={(e) => setReadDate(e.target.value)} className="w-full px-3 py-2 rounded border border-slate-300 text-sm" />
                 </div>
                 <div>
-                  <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Meter Reading (kWh) *</label>
+                  <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Meter Reading (kWh) *", "மீட்டர் எண் (kWh) *")}</label>
                   <input type="number" step="0.01" min="0" required placeholder="e.g. 15490" value={readKwh} onChange={(e) => setReadKwh(e.target.value)} className="w-full px-3 py-2 rounded border border-slate-300 text-sm" />
                 </div>
               </div>
-              <button type="submit" className="px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold">Save Reading</button>
+              <button type="submit" disabled={submitting} className="px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold disabled:opacity-50 cursor-pointer">{tr("Save Reading", "ரீடிங் சேமி")}</button>
               <div className="text-xs text-slate-600 space-y-1 pt-2">
                 {ebReadings.slice(0, 5).map((r) => (
                   <div key={r.id} className="flex items-center justify-between gap-2">
@@ -725,7 +781,7 @@ export function DeliveriesPage() {
                       onClick={() => softDeleteRecord(`/eb-readings/${r.id}`, `EB Reading (${formatDateDMY(r.reading_date)})`)}
                       className="text-rose-600 hover:underline text-[11px] cursor-pointer"
                     >
-                      Void
+                      {tr("Void", "நீக்கு")}
                     </button>
                   </div>
                 ))}
@@ -733,44 +789,44 @@ export function DeliveriesPage() {
             </form>
 
             <form onSubmit={submitEbBill} className="bg-white p-4 rounded-xl border border-slate-200 space-y-2.5">
-              <h2 className="text-sm font-bold">Record Official Bi-Monthly EB Bill</h2>
+              <h2 className="text-sm font-bold">{tr("Record Official Bi-Monthly EB Bill", "இரு மாத EB பில் பதிவு")}</h2>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Bill Period Start *</label>
+                  <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Bill Period Start *", "பில் தொடக்க தேதி *")}</label>
                   <input type="date" required value={billStart} onChange={(e) => setBillStart(e.target.value)} className="w-full px-2.5 py-1.5 rounded border border-slate-300 text-xs" />
                 </div>
                 <div>
-                  <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Bill Period End *</label>
+                  <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Bill Period End *", "பில் முடிவு தேதி *")}</label>
                   <input type="date" required value={billEnd} onChange={(e) => setBillEnd(e.target.value)} className="w-full px-2.5 py-1.5 rounded border border-slate-300 text-xs" />
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Units (kWh) *</label>
+                  <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Units (kWh) *", "யூனிட் (kWh) *")}</label>
                   <input type="number" step="0.01" min="0" required placeholder="e.g. 2150" value={billUnits} onChange={(e) => setBillUnits(e.target.value)} className="w-full px-2.5 py-1.5 rounded border border-slate-300 text-xs" />
                 </div>
                 <div>
-                  <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Net Bill (₹) *</label>
+                  <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Net Bill (₹) *", "மொத்த பில் (₹) *")}</label>
                   <input type="number" step="0.01" min="0" required placeholder="e.g. 7560" value={billNetRs} onChange={(e) => setBillNetRs(e.target.value)} className="w-full px-2.5 py-1.5 rounded border border-slate-300 text-xs" />
                 </div>
                 <div>
-                  <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Power Cut (mins, optional)</label>
+                  <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Power Cut (mins, opt.)", "மின்வெட்டு (நிமிடம்)")}</label>
                   <input type="number" min="0" placeholder="0" value={billPowerCutMins} onChange={(e) => setBillPowerCutMins(e.target.value)} className="w-full px-2.5 py-1.5 rounded border border-slate-300 text-xs" />
                 </div>
               </div>
-              <button type="submit" className="px-4 py-2 rounded-lg bg-amber-600 text-white text-xs font-semibold">Save EB Bill</button>
+              <button type="submit" disabled={submitting} className="px-4 py-2 rounded-lg bg-amber-600 text-white text-xs font-semibold cursor-pointer disabled:opacity-50">{tr("Save EB Bill", "EB பில் சேமி")}</button>
             </form>
           </div>
 
           <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-2">
-            <h3 className="text-sm font-bold flex items-center gap-1.5"><Upload className="w-4 h-4" /> Historical CSV Backfill</h3>
+            <h3 className="text-sm font-bold flex items-center gap-1.5"><Upload className="w-4 h-4" /> {tr("Historical CSV Backfill", "பழைய CSV தரவு பதிவேற்றம்")}</h3>
             <div className="flex flex-wrap gap-4 text-xs">
               <label className="px-3 py-2 rounded-lg border border-slate-300 cursor-pointer hover:bg-slate-50">
-                Import Historical EB Bills CSV
+                {tr("Import Historical EB Bills CSV", "பழைய EB பில் CSV பதிவேற்று")}
                 <input type="file" accept=".csv" className="hidden" onChange={(e) => e.target.files?.[0] && void uploadHistoryCsv("eb-bills-csv", e.target.files[0])} />
               </label>
               <label className="px-3 py-2 rounded-lg border border-slate-300 cursor-pointer hover:bg-slate-50">
-                Import Weekly Deliveries CSV
+                {tr("Import Weekly Deliveries CSV", "வாராந்திர டெலிவரி CSV பதிவேற்று")}
                 <input type="file" accept=".csv" className="hidden" onChange={(e) => e.target.files?.[0] && void uploadHistoryCsv("deliveries-csv", e.target.files[0])} />
               </label>
             </div>
@@ -780,11 +836,11 @@ export function DeliveriesPage() {
             {ebBills.map((b) => (
               <div key={b.id} className="px-4 py-2.5 text-xs flex flex-wrap justify-between items-center gap-2">
                 <span>
-                  <b>{formatDateDMY(b.period_start)} to {formatDateDMY(b.period_end)}</b> · {b.units_consumed} kWh · Cut {formatHoursFromMins(b.total_power_cut_mins)} hrs
+                  <b>{formatDateDMY(b.period_start)} – {formatDateDMY(b.period_end)}</b> · {b.units_consumed} kWh · {tr("Cut", "மின்வெட்டு")} {formatHoursFromMins(b.total_power_cut_mins)} hrs
                 </span>
                 <div className="flex items-center gap-3">
                   <span>
-                    Energy {formatRupeesFromPaise(b.energy_paise)} + Fixed {formatRupeesFromPaise(b.fixed_paise)} + Tax{" "}
+                    {tr("Energy", "மின் கட்டணம்")} {formatRupeesFromPaise(b.energy_paise)} + {tr("Fixed", "நிலை")} {formatRupeesFromPaise(b.fixed_paise)} + {tr("Tax", "வரி")}{" "}
                     {formatRupeesFromPaise(b.tax_paise)} = <b>{formatRupeesFromPaise(b.net_bill_paise)}</b>
                   </span>
                   <button
@@ -792,7 +848,7 @@ export function DeliveriesPage() {
                     onClick={() => void softDeleteRecord(`/eb-bills/${b.id}`, `EB Bill ${b.period_start}`)}
                     className="text-rose-600 hover:underline inline-flex items-center gap-0.5"
                   >
-                    <Trash2 className="w-3.5 h-3.5" /> Void
+                    <Trash2 className="w-3.5 h-3.5" /> {tr("Void", "நீக்கு")}
                   </button>
                 </div>
               </div>
@@ -806,19 +862,19 @@ export function DeliveriesPage() {
         <div className="grid sm:grid-cols-2 gap-4">
           <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
             <h2 className="text-sm font-bold flex items-center gap-1.5">
-              <FileSpreadsheet className="w-4 h-4 text-emerald-700" /> Excel-Safe CSV Exports (UTF-8 BOM)
+              <FileSpreadsheet className="w-4 h-4 text-emerald-700" /> {tr("Excel-Safe CSV Exports (UTF-8 BOM)", "எக்செல் CSV பதிவிறக்கம் (தமிழ் ஆதரவு)")}
             </h2>
             <div className="grid grid-cols-2 gap-2">
               {[
-                ["shifts", "Shift Entries"],
-                ["beams", "Warp Beams"],
-                ["payslips", "Payslips"],
-                ["advances", "Advances"],
-                ["deliveries", "Deliveries"],
-                ["expenses", "Expenses"],
-                ["eb_bills", "EB Bills"],
-                ["eb_readings", "EB Readings"],
-                ["audit_logs", "Audit Log"],
+                ["shifts", tr("Shift Entries", "ஷிப்ட் பதிவுகள்")],
+                ["beams", tr("Warp Beams", "பாவு பீம்கள்")],
+                ["payslips", tr("Payslips", "சம்பள ரசீதுகள்")],
+                ["advances", tr("Advances", "அட்வான்ஸ்")],
+                ["deliveries", tr("Deliveries", "டெலிவரி")],
+                ["expenses", tr("Expenses", "செலவுகள்")],
+                ["eb_bills", tr("EB Bills", "EB பில்கள்")],
+                ["eb_readings", tr("EB Readings", "EB ரீடிங்")],
+                ["audit_logs", tr("Audit Log", "மாற்றப் பதிவு")],
               ].map(([entity, label]) => (
                 <button
                   key={entity}
@@ -834,18 +890,20 @@ export function DeliveriesPage() {
 
           <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
             <h2 className="text-sm font-bold flex items-center gap-1.5">
-              <Database className="w-4 h-4 text-amber-600" /> Full SQLite Database Backup
+              <Database className="w-4 h-4 text-amber-600" /> {tr("Full SQLite Database Backup", "முழு தரவுத்தள பேக்கப் (.db)")}
             </h2>
             <p className="text-xs text-slate-600">
-              Downloads a transactionally consistent snapshot of your entire shed ledger using SQLite online backup API.
-              Store copies weekly on Google Drive or a USB stick.
+              {tr(
+                "Downloads a transactionally consistent snapshot of your entire shed ledger using SQLite online backup API. Store copies weekly on Google Drive or a USB stick.",
+                "உங்கள் முழு ஆலை கணக்கின் பாதுகாப்பான பேக்கப்பைப் பதிவிறக்கும். வாரந்தோறும் Google Drive அல்லது USB-இல் சேமித்து வைக்கவும்."
+              )}
             </p>
             <button
               type="button"
               onClick={() => void downloadProtectedFile("/backup/sqlite", "loomos_backup.db")}
               className="px-4 py-2.5 rounded-xl bg-slate-900 text-white text-xs font-bold inline-flex items-center gap-2"
             >
-              <Download className="w-4 h-4" /> Download Full Backup (.db)
+              <Download className="w-4 h-4" /> {tr("Download Full Backup (.db)", "முழு பேக்கப் பதிவிறக்கு (.db)")}
             </button>
           </div>
         </div>

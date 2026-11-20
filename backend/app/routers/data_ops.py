@@ -7,7 +7,7 @@ import io
 import sqlite3
 import tempfile
 from datetime import date, datetime, timezone
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 from pathlib import Path
 from typing import Annotated
 
@@ -16,7 +16,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.audit import record_audit
-from app.core.config import get_settings
+from app.core.config import get_settings, today_ist
 from app.core.database import get_db
 from app.core.security import require_owner
 from app.models.core import (
@@ -39,12 +39,31 @@ from app.services.seed_defaults import import_historical_seed
 router = APIRouter(prefix="/api/v1", tags=["exports-backup"])
 
 
+MAX_CSV_UPLOAD_BYTES = 5 * 1024 * 1024  # 5 MB CSV cap
+
+
+def _sanitize_csv_cell(val: object) -> object:
+    """Prevent Excel CSV formula injection (=, +, -, @, tab, CR) on text fields."""
+    if not isinstance(val, str) or not val:
+        return val
+    if val[0] in ("=", "+", "-", "@", "\t", "\r"):
+        # Allow legitimate negative numbers like "-12.50"
+        if val[0] == "-":
+            try:
+                Decimal(val)
+                return val
+            except InvalidOperation:
+                pass
+        return f"'{val}"
+    return val
+
+
 def _csv_response(filename: str, headers: list[str], rows: list[list[object]]) -> Response:
     """Encode CSV with UTF-8 BOM (utf-8-sig) so Excel opens Tamil/Hindi and Rupee symbols cleanly."""
     buf = io.StringIO()
     writer = csv.writer(buf)
     writer.writerow(headers)
-    writer.writerows(rows)
+    writer.writerows([[_sanitize_csv_cell(c) for c in row] for row in rows])
     payload = buf.getvalue().encode("utf-8-sig")
     return Response(
         content=payload,
@@ -59,7 +78,7 @@ def export_entity_csv(
     _owner: Annotated[User, Depends(require_owner)],
     db: Annotated[Session, Depends(get_db)],
 ) -> Response:
-    today_tag = date.today().isoformat()
+    today_tag = today_ist().isoformat()
     if entity == "shifts":
         items = db.scalars(select(ShiftEntry).where(ShiftEntry.is_deleted.is_(False)).order_by(ShiftEntry.entry_date.desc())).all()
         return _csv_response(
@@ -148,22 +167,38 @@ async def import_eb_bills_csv(
     file: UploadFile = File(...),
 ) -> dict[str, int]:
     """Import historical EB bills CSV after initial setup."""
-    raw = (await file.read()).decode("utf-8-sig")
+    raw_bytes = await file.read(MAX_CSV_UPLOAD_BYTES + 1)
+    if len(raw_bytes) > MAX_CSV_UPLOAD_BYTES:
+        raise HTTPException(status_code=status.HTTP_413_CONTENT_TOO_LARGE, detail="CSV file too large (max 5 MB)")
+    try:
+        raw = raw_bytes.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="CSV must be UTF-8 encoded") from exc
+
     reader = csv.DictReader(io.StringIO(raw))
     rows: list[HistoricalEbSeedRow] = []
-    for line in reader:
+    for row_num, line in enumerate(reader, start=2):
         if not line.get("period_start") or not line.get("units_consumed"):
             continue
-        rows.append(
-            HistoricalEbSeedRow(
-                period_start=date.fromisoformat(line["period_start"].strip()),
-                period_end=date.fromisoformat(line["period_end"].strip()),
-                units_consumed=Decimal(line["units_consumed"].strip()),
-                net_bill_paise=round(float(line["net_bill_rs"].strip()) * 100),
-                total_power_cut_mins=int(line.get("power_cut_mins") or 0),
-                notes=line.get("notes") or None,
+        try:
+            net_paise = int(
+                (Decimal(line["net_bill_rs"].strip()) * Decimal(100)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
             )
-        )
+            rows.append(
+                HistoricalEbSeedRow(
+                    period_start=date.fromisoformat(line["period_start"].strip()),
+                    period_end=date.fromisoformat(line["period_end"].strip()),
+                    units_consumed=Decimal(line["units_consumed"].strip()),
+                    net_bill_paise=net_paise,
+                    total_power_cut_mins=int(line.get("power_cut_mins") or 0),
+                    notes=line.get("notes") or None,
+                )
+            )
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Invalid EB CSV row {row_num}: {exc}",
+            ) from exc
     settings = db.scalar(select(UnitSettings).limit(1))
     plan = (
         db.scalar(
@@ -189,22 +224,38 @@ async def import_deliveries_csv(
     file: UploadFile = File(...),
 ) -> dict[str, int]:
     """Import historical weekly deliveries CSV after initial setup."""
-    raw = (await file.read()).decode("utf-8-sig")
+    raw_bytes = await file.read(MAX_CSV_UPLOAD_BYTES + 1)
+    if len(raw_bytes) > MAX_CSV_UPLOAD_BYTES:
+        raise HTTPException(status_code=status.HTTP_413_CONTENT_TOO_LARGE, detail="CSV file too large (max 5 MB)")
+    try:
+        raw = raw_bytes.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="CSV must be UTF-8 encoded") from exc
+
     reader = csv.DictReader(io.StringIO(raw))
     rows: list[HistoricalDeliverySeedRow] = []
-    for line in reader:
+    for row_num, line in enumerate(reader, start=2):
         if not line.get("delivery_date") or not line.get("metres"):
             continue
-        rows.append(
-            HistoricalDeliverySeedRow(
-                delivery_date=date.fromisoformat(line["delivery_date"].strip()),
-                trader_name=line["trader_name"].strip(),
-                challan_no=line["challan_no"].strip(),
-                sort_name=(line.get("sort_name") or "").strip() or None,
-                metres=Decimal(line["metres"].strip()),
-                applied_rate_paise=round(float(line["rate_rs_per_m"].strip()) * 100),
+        try:
+            rate_paise = int(
+                (Decimal(line["rate_rs_per_m"].strip()) * Decimal(100)).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
             )
-        )
+            rows.append(
+                HistoricalDeliverySeedRow(
+                    delivery_date=date.fromisoformat(line["delivery_date"].strip()),
+                    trader_name=line["trader_name"].strip(),
+                    challan_no=line["challan_no"].strip(),
+                    sort_name=(line.get("sort_name") or "").strip() or None,
+                    metres=Decimal(line["metres"].strip()),
+                    applied_rate_paise=rate_paise,
+                )
+            )
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"Invalid Deliveries CSV row {row_num}: {exc}",
+            ) from exc
     settings = db.scalar(select(UnitSettings).limit(1))
     plan = (
         db.scalar(

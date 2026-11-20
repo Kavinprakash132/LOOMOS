@@ -301,6 +301,8 @@ def soft_delete_weft_receipt(
         reason=payload.reason.strip(),
         audit_fields=["beam_id", "bags", "net_weight_kg"],
     )
+    if wr.beam_id is not None:
+        sync_weft_wastage_alert(db, wr.beam_id)
     db.commit()
     db.refresh(wr)
     return WeftReceiptResponse.model_validate(wr)

@@ -58,6 +58,9 @@ def main() -> None:
             "0.0.0.0",
             "--port",
             port,
+            "--proxy-headers",
+            "--forwarded-allow-ips",
+            "*",
         ],
     )
 

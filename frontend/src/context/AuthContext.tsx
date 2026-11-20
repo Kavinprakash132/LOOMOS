@@ -10,6 +10,7 @@ interface AuthContextValue {
   user: User | null;
   lang: LangCode;
   t: (key: string) => string;
+  tr: (en: string, ta: string) => string;
   refreshState: () => Promise<void>;
   completeAuth: (resp: AuthTokenResponse) => void;
   logout: () => void;
@@ -80,6 +81,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }, []);
 
+  useEffect(() => {
+    const onUnauthorized = () => {
+      setStoredToken(null);
+      setUser(null);
+    };
+    window.addEventListener("loomos:unauthorized", onUnauthorized);
+    return () => window.removeEventListener("loomos:unauthorized", onUnauthorized);
+  }, []);
+
   const toggleLanguage = useCallback(
     async (explicit?: LangCode) => {
       const next: LangCode = explicit ?? (lang === "en" ? "ta" : "en");
@@ -105,9 +115,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [lang]
   );
 
+  const tr = useCallback((en: string, ta: string) => (lang === "ta" ? ta : en), [lang]);
+
+  useEffect(() => {
+    document.documentElement.lang = lang;
+  }, [lang]);
+
   return (
     <AuthContext.Provider
-      value={{ loading, backendError, setupStatus, user, lang, t, refreshState, completeAuth, logout, toggleLanguage }}
+      value={{ loading, backendError, setupStatus, user, lang, t, tr, refreshState, completeAuth, logout, toggleLanguage }}
     >
       {children}
     </AuthContext.Provider>

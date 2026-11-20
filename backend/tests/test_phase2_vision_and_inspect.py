@@ -14,7 +14,12 @@ def test_model_card_and_supervisor_beams_and_inspect_access(client: TestClient, 
     mc = client.get("/api/v1/inspections/model-card", headers=owner_headers)
     assert mc.status_code == 200, mc.text
     card = mc.json()
-    assert card["winning_model_name"] in {"ResNet-18 + CLAHE", "MobileNetV3-Small + CLAHE"}
+    assert card["winning_model_name"] in {
+        "EfficientNet-B0 (Multi-Dataset RGB)",
+        "MobileNetV3-Large (Multi-Dataset RGB)",
+        "ResNet-18 + CLAHE",
+        "MobileNetV3-Small + CLAHE",
+    }
     assert len(card["comparison"]) == 2
     assert len(card["samples"]) == 6
     assert card["held_out_split_summary"]["test_total_patches"] > 500

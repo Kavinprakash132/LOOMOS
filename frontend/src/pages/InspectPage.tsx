@@ -1,24 +1,28 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, Camera, CheckCircle2, Cpu, Eye, Upload } from "lucide-react";
+import { AlertTriangle, Camera, CheckCircle2, Cpu, Eye, Image as ImageIcon } from "lucide-react";
 import { apiRequest, formatDateTimeIST } from "../api/client";
 import { PageGuideBanner } from "../components/PageGuideBanner";
 import { TechnicalDetailsToggle } from "../components/TechnicalDetailsToggle";
+import { useAuth } from "../context/AuthContext";
 import { Beam, InspectionRecord, Loom, ModelCardResponse, Weaver } from "../types/api";
 
-const DEFECT_LABEL_OPTIONS = [
-  "Broken End (Warp)",
-  "Broken Yarn",
-  "Broken Pick (Weft)",
-  "Fuzzyball / Knot",
-  "Cut Selvage",
-  "Weft Crack",
-  "Warp Ball / Nep",
-  "Oil / Stain",
-  "Crease",
-  "Other Cloth Defect",
+const DEFECT_LABEL_OPTIONS: { value: string; ta: string }[] = [
+  { value: "Broken End (Warp)", ta: "பாவு நூல் அறுந்து போனது (Broken End)" },
+  { value: "Broken Yarn", ta: "நூல் அறுந்து போனது (Broken Yarn)" },
+  { value: "Broken Pick (Weft)", ta: "ஊடை நூல் அறுந்து போனது (Broken Pick)" },
+  { value: "Fuzzyball / Knot", ta: "நூல் முடிச்சு / பஞ்சு உருண்டை" },
+  { value: "Cut Selvage", ta: "ஓரம் கிழிந்தது (Cut Selvage)" },
+  { value: "Weft Crack", ta: "ஊடை இடைவெளி (Weft Crack)" },
+  { value: "Warp Ball / Nep", ta: "பாவு முடிச்சு / நெப்" },
+  { value: "Oil / Stain", ta: "எண்ணெய் / கறை" },
+  { value: "Crease", ta: "சுருக்கம் (Crease)" },
+  { value: "Other Cloth Defect", ta: "பிற துணி குறைபாடு" },
 ];
 
+const DEFECT_VALUES = DEFECT_LABEL_OPTIONS.map((o) => o.value);
+
 export function InspectPage() {
+  const { tr } = useAuth();
   const [card, setCard] = useState<ModelCardResponse | null>(null);
   const [inspections, setInspections] = useState<InspectionRecord[]>([]);
   const [looms, setLooms] = useState<Loom[]>([]);
@@ -32,7 +36,7 @@ export function InspectPage() {
   const [active, setActive] = useState<InspectionRecord | null>(null);
   const [viewMode, setViewMode] = useState<"heatmap" | "side" | "raw">("heatmap");
   const [reviewStatus, setReviewStatus] = useState<"CONFIRMED_DEFECT" | "CONFIRMED_CLEAN">("CONFIRMED_DEFECT");
-  const [reviewLabel, setReviewLabel] = useState<string>(DEFECT_LABEL_OPTIONS[0]);
+  const [reviewLabel, setReviewLabel] = useState<string>(DEFECT_VALUES[0]);
   const [defectiveMetres, setDefectiveMetres] = useState<string>("0.50");
   const [addToShift, setAddToShift] = useState<boolean>(false);
 
@@ -44,10 +48,10 @@ export function InspectPage() {
   const syncReviewDefaults = useCallback((rec: InspectionRecord) => {
     const flagged = rec.prediction?.predicted_label === "Defect Flagged" || rec.review_status === "CONFIRMED_DEFECT";
     setReviewStatus(rec.review_status === "CONFIRMED_CLEAN" ? "CONFIRMED_CLEAN" : flagged ? "CONFIRMED_DEFECT" : "CONFIRMED_CLEAN");
-    if (rec.reviewed_label && DEFECT_LABEL_OPTIONS.includes(rec.reviewed_label)) {
+    if (rec.reviewed_label && DEFECT_VALUES.includes(rec.reviewed_label)) {
       setReviewLabel(rec.reviewed_label);
     } else {
-      setReviewLabel(DEFECT_LABEL_OPTIONS[0]);
+      setReviewLabel(DEFECT_VALUES[0]);
     }
     setDefectiveMetres(Number(rec.defective_metres) > 0 ? rec.defective_metres : flagged ? "0.50" : "0.00");
     setAddToShift(Boolean(rec.loom_id && flagged));
@@ -69,9 +73,9 @@ export function InspectPage() {
       setBeams(bm);
       setWeavers(wv);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load inspection workspace");
+      setError(err instanceof Error ? err.message : tr("Failed to load inspection workspace", "துணி ஆய்வுப் பக்கத்தை ஏற்ற முடியவில்லை"));
     }
-  }, []);
+  }, [tr]);
 
   useEffect(() => {
     void loadAll();
@@ -98,7 +102,7 @@ export function InspectPage() {
       syncReviewDefaults(rec);
       await loadAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not analyze cloth photo");
+      setError(err instanceof Error ? err.message : tr("Could not analyze cloth photo", "துணி புகைப்படத்தை ஆய்வு செய்ய முடியவில்லை"));
     } finally {
       setAnalyzing(false);
     }
@@ -108,6 +112,15 @@ export function InspectPage() {
     const file = e.target.files?.[0];
     if (file) void runAnalyze({ file });
     e.target.value = "";
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    if (analyzing) return;
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.type.startsWith("image/")) {
+      void runAnalyze({ file });
+    }
   };
 
   const handleSaveReview = async (e: React.FormEvent) => {
@@ -132,14 +145,19 @@ export function InspectPage() {
       setActive(updated);
       setSuccess(
         reviewStatus === "CONFIRMED_DEFECT"
-          ? `Saved Confirmed Defect (${updated.reviewed_label})${
-              updated.shift_entry_id ? " and updated shift defective metres." : "."
-            }`
-          : "Saved Confirmed Clean Cloth photo for dataset tracking."
+          ? tr(
+              `Saved Confirmed Defect (${updated.reviewed_label})${
+                updated.shift_entry_id ? " and updated shift defective metres." : "."
+              }`,
+              `குறைபாடு உறுதி செய்யப்பட்டது (${updated.reviewed_label})${
+                updated.shift_entry_id ? " மற்றும் இன்றைய ஷிப்ட் பதிவிலும் சேர்க்கப்பட்டது." : "."
+              }`
+            )
+          : tr("Saved Confirmed Clean Cloth photo for dataset tracking.", "சுத்தமான துணி என உறுதிசெய்யப்பட்டு சேமிக்கப்பட்டது.")
       );
       await loadAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save inspection review");
+      setError(err instanceof Error ? err.message : tr("Failed to save inspection review", "ஆய்வு முடிவை சேமிக்க முடியவில்லை"));
     } finally {
       setSavingReview(false);
     }
@@ -149,16 +167,26 @@ export function InspectPage() {
   const cleanCount = inspections.filter((i) => i.review_status === "CONFIRMED_CLEAN").length;
   const winnerStats = card?.comparison.find((c) => c.arch === card.architecture) ?? card?.comparison[0];
 
+  const translatePredictionLabel = (lbl?: string | null) => {
+    if (!lbl) return tr("Pending", "நிலுவையில்");
+    if (lbl === "Defect Flagged") return tr("Defect Flagged", "குறைபாடு கண்டறியப்பட்டது");
+    if (lbl === "Clean Cloth") return tr("Clean Cloth", "சுத்தமான துணி");
+    return lbl;
+  };
+
   return (
     <div className="space-y-5 pb-10">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
             <Camera className="w-5 h-5 text-amber-600" />
-            Cloth Quality Audit &amp; AI Defect Inspection
+            {tr("Cloth Quality Audit & AI Defect Inspection", "துணி தர ஆய்வு & AI குறைபாடு கண்டறிதல்")}
           </h1>
           <p className="text-xs text-slate-500">
-            Take or upload a loom cloth photo, inspect the Grad-CAM defect highlight map, and confirm Clean or Defect (saves every checked photo).
+            {tr(
+              "Take a photo or choose from your gallery/files, inspect the AI defect highlight map, and confirm Clean or Defect.",
+              "கேமராவில் படம் எடுக்கவும் அல்லது கேலரி/கோப்புகளில் இருந்து தேர்ந்தெடுக்கவும் — AI குறைபாட்டு பகுதியை காட்டும்."
+            )}
           </p>
         </div>
       </div>
@@ -168,32 +196,32 @@ export function InspectPage() {
 
       <PageGuideBanner
         steps={[
-          "Take or upload a cloth photo (or tap a sample)",
-          "Check where the AI highlights possible defects",
-          "Confirm Defect or Clean Cloth to save",
+          tr("Take a photo or pick from Gallery / Files (or tap a sample)", "படம் எடுக்கவும் அல்லது கேலரி / கோப்பு தேர்ந்தெடுக்கவும்"),
+          tr("Check where the AI highlights possible defects", "AI காட்டும் குறைபாட்டு இடத்தைச் சரிபார்க்கவும்"),
+          tr("Confirm Defect or Clean Cloth to save", "குறைபாடு அல்லது சுத்தமான துணி என சேமிக்கவும்"),
         ]}
       />
 
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="bg-white p-3.5 rounded-xl border border-slate-200">
-          <div className="text-xs text-slate-500">Photos Checked</div>
+          <div className="text-xs text-slate-500">{tr("Photos Checked", "சோதித்த படங்கள்")}</div>
           <div className="text-xl font-bold">{inspections.length}</div>
         </div>
         <div className="bg-white p-3.5 rounded-xl border border-slate-200">
-          <div className="text-xs text-slate-500">Confirmed Defects</div>
+          <div className="text-xs text-slate-500">{tr("Confirmed Defects", "உறுதியான குறைபாடுகள்")}</div>
           <div className="text-xl font-bold text-rose-600">{defectCount}</div>
         </div>
         <div className="bg-white p-3.5 rounded-xl border border-slate-200">
-          <div className="text-xs text-slate-500">Confirmed Clean</div>
+          <div className="text-xs text-slate-500">{tr("Confirmed Clean", "சுத்தமான துணிகள்")}</div>
           <div className="text-xl font-bold text-emerald-700">{cleanCount}</div>
         </div>
         <div className="bg-white p-3.5 rounded-xl border border-slate-200">
           <div className="text-xs text-slate-500 flex items-center gap-1">
-            <Cpu className="w-3.5 h-3.5 text-amber-600" /> Active ONNX Model
+            <Cpu className="w-3.5 h-3.5 text-amber-600" /> {tr("Active ONNX Model", "செயலில் உள்ள AI மாடல்")}
           </div>
           <div className="text-sm font-bold text-slate-900 mt-0.5 truncate">
-            {card ? card.winning_model_name : "Loading..."}
+            {card ? card.winning_model_name : tr("Loading...", "ஏற்றப்படுகிறது...")}
           </div>
           <div className="text-[11px] text-slate-500">
             {winnerStats ? `CPU ~${winnerStats.inference_ms} ms/img · F1 ${winnerStats.defect_f1}` : ""}
@@ -204,16 +232,16 @@ export function InspectPage() {
       {/* Step 1: Upload Photo or Pick Reference Sample */}
       <div className="grid lg:grid-cols-2 gap-4">
         <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
-          <h2 className="text-sm font-bold">1. Upload / Capture Cloth Photo</h2>
+          <h2 className="text-sm font-bold">{tr("1. Capture or Choose Cloth Photo", "1. துணி புகைப்படம் எடுக்கவும் / பதிவேற்றவும்")}</h2>
           <div className="grid sm:grid-cols-3 gap-2">
             <div>
-              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Shuttle Loom (optional)</label>
+              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Shuttle Loom (optional)", "தறி (விருப்பம்)")}</label>
               <select
                 value={selectedLoomId}
                 onChange={(e) => setSelectedLoomId(e.target.value)}
                 className="w-full px-2.5 py-1.5 rounded border border-slate-300 text-xs bg-white"
               >
-                <option value="">-- Any Loom --</option>
+                <option value="">{tr("-- Any Loom --", "-- எந்த தறியும் --")}</option>
                 {looms.map((l) => (
                   <option key={l.id} value={l.id}>
                     {l.loom_number} ({l.rated_rpm} RPM)
@@ -222,13 +250,13 @@ export function InspectPage() {
               </select>
             </div>
             <div>
-              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Warp Beam (optional)</label>
+              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Warp Beam (optional)", "பீம் (விருப்பம்)")}</label>
               <select
                 value={selectedBeamId}
                 onChange={(e) => setSelectedBeamId(e.target.value)}
                 className="w-full px-2.5 py-1.5 rounded border border-slate-300 text-xs bg-white"
               >
-                <option value="">-- Any Beam --</option>
+                <option value="">{tr("-- Any Beam --", "-- எந்த பீமும் --")}</option>
                 {beams.map((b) => (
                   <option key={b.id} value={b.id}>
                     {b.beam_no} ({b.status})
@@ -237,13 +265,13 @@ export function InspectPage() {
               </select>
             </div>
             <div>
-              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Weaver (optional)</label>
+              <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Weaver (optional)", "நெசவாளர் (விருப்பம்)")}</label>
               <select
                 value={selectedWeaverId}
                 onChange={(e) => setSelectedWeaverId(e.target.value)}
                 className="w-full px-2.5 py-1.5 rounded border border-slate-300 text-xs bg-white"
               >
-                <option value="">-- Any Weaver --</option>
+                <option value="">{tr("-- Any Weaver --", "-- எந்த நெசவாளரும் --")}</option>
                 {weavers.map((w) => (
                   <option key={w.id} value={w.id}>
                     {w.full_name}
@@ -253,34 +281,66 @@ export function InspectPage() {
             </div>
           </div>
 
-          <label className="flex flex-col items-center justify-center border-2 border-dashed border-slate-300 rounded-xl p-5 text-center hover:border-amber-500 hover:bg-amber-50/40 cursor-pointer transition">
-            <Upload className="w-6 h-6 text-amber-600 mb-1.5" />
-            <span className="text-xs font-bold text-slate-800">
-              {analyzing ? "Running AI Inspection..." : "Tap to Take Photo or Choose Cloth Image"}
-            </span>
-            <span className="text-[11px] text-slate-500 mt-0.5">
-              Supports phone camera JPG / PNG — runs offline on shed CPU in milliseconds
-            </span>
-            <input
-              type="file"
-              accept="image/*"
-              capture="environment"
-              disabled={analyzing}
-              onChange={handleFileChange}
-              className="hidden"
-            />
-          </label>
+          <div
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={handleDrop}
+            className="border-2 border-dashed border-slate-300 rounded-xl p-4 bg-slate-50/50 space-y-3 text-center"
+          >
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <label
+                className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold shadow-sm transition ${
+                  analyzing ? "opacity-50 pointer-events-none" : "cursor-pointer"
+                }`}
+              >
+                <Camera className="w-4 h-4 shrink-0" />
+                <span>{analyzing ? tr("Running AI...", "AI ஆய்வு...") : tr("Take Photo (Camera)", "படம் எடு (கேமரா)")}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  disabled={analyzing}
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+              </label>
+
+              <label
+                className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-sm transition ${
+                  analyzing ? "opacity-50 pointer-events-none" : "cursor-pointer"
+                }`}
+              >
+                <ImageIcon className="w-4 h-4 shrink-0" />
+                <span>{analyzing ? tr("Running AI...", "AI ஆய்வு...") : tr("Gallery / Choose File", "கேலரி / கோப்பு தேர்ந்தெடு")}</span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  disabled={analyzing}
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+              </label>
+            </div>
+            <p className="text-[11px] text-slate-500">
+              {tr(
+                "Use Camera for live cloth photos, or Gallery / Files to pick existing JPG / PNG images (or drag & drop here).",
+                "நேரடி புகைப்படத்திற்கு கேமரா, அல்லது சேமித்த JPG / PNG படங்களைத் தேர்ந்தெடுக்க கேலரி / கோப்பு பட்டனை அழுத்தவும்."
+              )}
+            </p>
+          </div>
         </div>
 
         <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-2.5">
           <div className="flex items-center justify-between gap-2">
-            <h2 className="text-sm font-bold">AITEX Reference Sample (demo only)</h2>
+            <h2 className="text-sm font-bold">{tr("Reference Cloth Samples (Test)", "மாதிரி துணி படங்கள் (சோதனை)")}</h2>
             <span className="text-[10px] px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-semibold">
-              Held-Out Test Set
+              {tr("Held-Out Test Set", "சோதனை தொகுப்பு")}
             </span>
           </div>
           <p className="text-[11px] text-slate-500">
-            Click any held-out textile sample below to test live ONNX detection &amp; Grad-CAM heatmaps right away:
+            {tr(
+              "Tap any textile sample below to test live AI defect detection & heatmaps right away:",
+              "உடனே AI சோதனை செய்ய கீழே உள்ள ஏதேனும் ஒரு மாதிரி துணி படத்தைத் தட்டவும்:"
+            )}
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {card?.samples.map((s) => (
@@ -302,7 +362,7 @@ export function InspectPage() {
                     s.is_defect ? "text-rose-700" : "text-emerald-700"
                   }`}
                 >
-                  {s.is_defect ? "Defect Sample" : "Clean Sample"}
+                  {s.is_defect ? tr("Defect Sample", "குறைபாடு மாதிரி") : tr("Clean Sample", "சுத்தமான மாதிரி")}
                 </div>
               </button>
             ))}
@@ -317,7 +377,7 @@ export function InspectPage() {
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-sm font-bold flex items-center gap-1.5">
                 <Eye className="w-4 h-4 text-amber-600" />
-                Inspection #{active.id} — AI Heatmap &amp; Review
+                {tr(`Inspection #${active.id} — AI Heatmap & Review`, `ஆய்வு #${active.id} — AI ஹீட்மேப் & உறுதிப்படுத்தல்`)}
               </h2>
               {active.prediction && (
                 <span
@@ -327,21 +387,21 @@ export function InspectPage() {
                       : "bg-emerald-100 text-emerald-800"
                   }`}
                 >
-                  {active.prediction.predicted_label} ({(active.prediction.confidence * 100).toFixed(1)}%)
+                  {translatePredictionLabel(active.prediction.predicted_label)} ({(active.prediction.confidence * 100).toFixed(1)}%)
                 </span>
               )}
               {active.prediction?.is_uncertain && (
                 <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[11px] font-semibold">
-                  Borderline — Verify Visually
+                  {tr("Borderline — Verify Visually", "சந்தேகம் — கண்ணால் சரிபார்க்கவும்")}
                 </span>
               )}
             </div>
 
             <div className="inline-flex rounded-lg border border-slate-300 bg-slate-100 p-0.5 text-xs font-semibold">
               {[
-                { id: "heatmap", label: "Heatmap Overlay" },
-                { id: "side", label: "Side-by-Side" },
-                { id: "raw", label: "Original Cloth" },
+                { id: "heatmap", label: tr("Heatmap Overlay", "ஹீட்மேப்") },
+                { id: "side", label: tr("Side-by-Side", "அருகருகே") },
+                { id: "raw", label: tr("Original Cloth", "அசல் படம்") },
               ].map((m) => (
                 <button
                   key={m.id}
@@ -362,11 +422,11 @@ export function InspectPage() {
               {viewMode === "side" ? (
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <div className="text-[11px] text-slate-500 mb-1">Original Photo</div>
+                    <div className="text-[11px] text-slate-500 mb-1">{tr("Original Photo", "அசல் படம்")}</div>
                     <img src={active.raw_image_url} alt="Original cloth" className="w-full rounded-lg border border-slate-200" />
                   </div>
                   <div>
-                    <div className="text-[11px] text-slate-500 mb-1">Grad-CAM Focus</div>
+                    <div className="text-[11px] text-slate-500 mb-1">{tr("Grad-CAM Focus", "AI கவனம் (Grad-CAM)")}</div>
                     <img
                       src={active.heatmap_image_url ?? active.raw_image_url}
                       alt="Grad-CAM overlay"
@@ -383,15 +443,17 @@ export function InspectPage() {
               )}
               {active.prediction && (
                 <div className="text-[11px] text-slate-500">
-                  Model: <b>{active.prediction.model_version}</b> · Cutoff{" "}
-                  {(active.prediction.threshold_used * 100).toFixed(0)}% · Ran in{" "}
+                  {tr("Model", "மாடல்")}: <b>{active.prediction.model_version}</b> · {tr("Cutoff", "வரம்பு")}{" "}
+                  {(active.prediction.threshold_used * 100).toFixed(0)}% · {tr("Ran in", "நேரம்")}{" "}
                   <b>{active.prediction.inference_ms} ms</b>
                 </div>
               )}
             </div>
 
             <form onSubmit={handleSaveReview} className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
-              <div className="text-xs font-bold text-slate-800">Human Verification (Saves Photo for Audit &amp; Training)</div>
+              <div className="text-xs font-bold text-slate-800">
+                {tr("Human Verification (Saves Photo for Audit & Training)", "மனித உறுதிப்படுத்தல் (படத்தை பதிவில் சேமிக்கும்)")}
+              </div>
               <div className="grid grid-cols-2 gap-2">
                 <button
                   type="button"
@@ -402,7 +464,7 @@ export function InspectPage() {
                       : "bg-white text-slate-700 border-slate-300"
                   }`}
                 >
-                  <CheckCircle2 className="w-4 h-4" /> Confirm Clean Cloth
+                  <CheckCircle2 className="w-4 h-4" /> {tr("Confirm Clean Cloth", "சுத்தமான துணி")}
                 </button>
                 <button
                   type="button"
@@ -413,7 +475,7 @@ export function InspectPage() {
                       : "bg-white text-slate-700 border-slate-300"
                   }`}
                 >
-                  <AlertTriangle className="w-4 h-4" /> Confirm Defect
+                  <AlertTriangle className="w-4 h-4" /> {tr("Confirm Defect", "குறைபாடு உறுதி")}
                 </button>
               </div>
 
@@ -421,22 +483,22 @@ export function InspectPage() {
                 <div className="space-y-2.5">
                   <div className="grid sm:grid-cols-2 gap-2">
                     <div>
-                      <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Defect Type *</label>
+                      <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Defect Type *", "குறைபாடு வகை *")}</label>
                       <select
                         value={reviewLabel}
                         onChange={(e) => setReviewLabel(e.target.value)}
                         className="w-full px-2.5 py-1.5 rounded border border-slate-300 text-xs bg-white"
                       >
                         {DEFECT_LABEL_OPTIONS.map((opt) => (
-                          <option key={opt} value={opt}>
-                            {opt}
+                          <option key={opt.value} value={opt.value}>
+                            {tr(opt.value, opt.ta)}
                           </option>
                         ))}
                       </select>
                     </div>
                     <div>
                       <label className="text-[11px] font-medium text-slate-600 block mb-0.5">
-                        Damaged Cloth (m, optional)
+                        {tr("Damaged Cloth (m, optional)", "சேதமான துணி (மீட்டர், விருப்பம்)")}
                       </label>
                       <input
                         type="number"
@@ -455,7 +517,10 @@ export function InspectPage() {
                         checked={addToShift}
                         onChange={(e) => setAddToShift(e.target.checked)}
                       />
-                      Also add damaged metres to latest shift on selected loom (unlocks Dashboard Quality %)
+                      {tr(
+                        "Also add damaged metres to latest shift on selected loom (unlocks Dashboard Quality %)",
+                        "தேர்ந்தெடுத்த தறியின் சமீபத்திய ஷிப்ட் பதிவிலும் சேத மீட்டரை சேர்க்கவும்"
+                      )}
                     </label>
                   )}
                 </div>
@@ -466,7 +531,7 @@ export function InspectPage() {
                 disabled={savingReview}
                 className="w-full py-2 px-4 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold cursor-pointer disabled:opacity-50"
               >
-                {savingReview ? "Saving Review..." : "Save Confirmed Review"}
+                {savingReview ? tr("Saving Review...", "சேமிக்கப்படுகிறது...") : tr("Save Confirmed Review", "உறுதிப்படுத்தலை சேமி")}
               </button>
             </form>
           </div>
@@ -475,9 +540,14 @@ export function InspectPage() {
 
       {/* Recent Reviewed Photos */}
       <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-2.5">
-        <h2 className="text-sm font-bold">Recent Cloth Inspections ({inspections.length})</h2>
+        <h2 className="text-sm font-bold">{tr(`Recent Cloth Inspections (${inspections.length})`, `சமீபத்திய துணி ஆய்வுகள் (${inspections.length})`)}</h2>
         {inspections.length === 0 ? (
-          <div className="text-xs text-slate-500 py-4">No cloth photos checked yet. Upload a photo or click a reference sample above.</div>
+          <div className="text-xs text-slate-500 py-4">
+            {tr(
+              "No cloth photos checked yet. Take a photo, choose from gallery, or tap a sample above.",
+              "இன்னும் துணி படங்கள் சோதிக்கப்படவில்லை. மேலே படம் எடுக்கவும் அல்லது கேலரியில் இருந்து தேர்ந்தெடுக்கவும்."
+            )}
+          </div>
         ) : (
           <div className="divide-y divide-slate-100 max-h-80 overflow-y-auto">
             {inspections.map((item) => (
@@ -498,12 +568,12 @@ export function InspectPage() {
                   />
                   <div className="min-w-0 text-xs">
                     <div className="font-bold text-slate-800 truncate">
-                      #{item.id} · {item.reviewed_label ?? item.prediction?.predicted_label ?? "Pending"}
+                      #{item.id} · {translatePredictionLabel(item.reviewed_label ?? item.prediction?.predicted_label)}
                       {item.loom_number ? ` (${item.loom_number})` : ""}
                     </div>
                     <div className="text-[11px] text-slate-500 truncate">
                       {formatDateTimeIST(item.inspected_at)}
-                      {Number(item.defective_metres) > 0 ? ` · Damaged ${item.defective_metres} m` : ""}
+                      {Number(item.defective_metres) > 0 ? ` · ${tr("Damaged", "சேதம்")} ${item.defective_metres} m` : ""}
                     </div>
                   </div>
                 </div>
@@ -517,10 +587,10 @@ export function InspectPage() {
                   }`}
                 >
                   {item.review_status === "CONFIRMED_DEFECT"
-                    ? "Defect"
+                    ? tr("Defect", "குறைபாடு")
                     : item.review_status === "CONFIRMED_CLEAN"
-                    ? "Clean"
-                    : "Pending"}
+                    ? tr("Clean", "சுத்தம்")
+                    : tr("Pending", "நிலுவை")}
                 </span>
               </button>
             ))}
@@ -531,15 +601,21 @@ export function InspectPage() {
       {/* Collapsible Thesis / Research AI Model Card */}
       {card && (
         <TechnicalDetailsToggle
-          title="Show AI Accuracy & Thesis Model Card (ResNet-18 vs MobileNetV3)"
-          subtitle="Held-out AITEX test comparison · Defect Recall, F1, Precision, ROC-AUC & CPU latency"
+          title={tr(
+            "Show AI Accuracy & Multi-Dataset Model Card (EfficientNet-B0 vs MobileNetV3-Large)",
+            "AI துல்லியம் & மாடல் ஒப்பீட்டு விவரம் (EfficientNet-B0 vs MobileNetV3-Large)"
+          )}
+          subtitle={tr(
+            "Held-out multi-dataset test comparison · Defect Recall, F1, Precision, ROC-AUC & CPU latency",
+            "பல்-தரவு சோதனை ஒப்பீடு · Defect Recall, F1, Precision, ROC-AUC & CPU வேகம்"
+          )}
         >
           <p className="text-xs text-slate-600">{card.held_out_split_summary.imbalance_note}</p>
           <div className="overflow-x-auto">
             <table className="w-full text-xs text-left">
               <thead className="border-b border-slate-200 text-slate-500">
                 <tr>
-                  <th className="py-1.5 pr-2">Model</th>
+                  <th className="py-1.5 pr-2">{tr("Model", "மாடல்")}</th>
                   <th className="py-1.5 pr-2">Defect Recall</th>
                   <th className="py-1.5 pr-2">Defect F1</th>
                   <th className="py-1.5 pr-2">Precision</th>
@@ -551,7 +627,10 @@ export function InspectPage() {
                 {card.comparison.map((m) => (
                   <tr key={m.arch} className={m.arch === card.architecture ? "bg-amber-50/70 font-semibold" : ""}>
                     <td className="py-1.5 pr-2">
-                      {m.name} {m.arch === card.architecture && <span className="text-[10px] text-amber-800">(Active)</span>}
+                      {m.name}{" "}
+                      {m.arch === card.architecture && (
+                        <span className="text-[10px] text-amber-800">({tr("Active", "செயலில்")})</span>
+                      )}
                     </td>
                     <td className="py-1.5 pr-2">{m.defect_recall.toFixed(3)}</td>
                     <td className="py-1.5 pr-2">{m.defect_f1.toFixed(3)}</td>
@@ -564,9 +643,9 @@ export function InspectPage() {
             </table>
           </div>
           <div className="text-[11px] text-slate-500">
-            Strip split: {card.held_out_split_summary.train_strips} train / {card.held_out_split_summary.val_strips} val /{" "}
-            {card.held_out_split_summary.test_strips} held-out test ({card.held_out_split_summary.test_defect_patches} defect,{" "}
-            {card.held_out_split_summary.test_clean_patches} clean patches).
+            {tr("Dataset split", "தரவு பிரிவு")}: {card.held_out_split_summary.train_strips} train / {card.held_out_split_summary.val_strips} val /{" "}
+            {card.held_out_split_summary.test_strips} test ({card.held_out_split_summary.test_defect_patches} defect,{" "}
+            {card.held_out_split_summary.test_clean_patches} clean).
           </div>
         </TechnicalDetailsToggle>
       )}

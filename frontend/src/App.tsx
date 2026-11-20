@@ -1,26 +1,40 @@
-import { useEffect } from "react";
+import { Suspense, lazy, useEffect } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
 import { AuthProvider, useAuth } from "./context/AuthContext";
-import { AuditLogPage } from "./pages/AuditLogPage";
-import { AnalyticsReportsPage } from "./pages/AnalyticsReportsPage";
-import { BeamsPage } from "./pages/BeamsPage";
-import { DashboardPage } from "./pages/DashboardPage";
-import { DeliveriesPage } from "./pages/DeliveriesPage";
-import { InspectPage } from "./pages/InspectPage";
-import { LoginPage } from "./pages/LoginPage";
-import { PayrollPage } from "./pages/PayrollPage";
-import { SettingsMastersPage } from "./pages/SettingsMastersPage";
-import { SetupPage } from "./pages/SetupPage";
-import { TodayShiftPage } from "./pages/TodayShiftPage";
+
+const AuditLogPage = lazy(() => import("./pages/AuditLogPage").then((m) => ({ default: m.AuditLogPage })));
+const AnalyticsReportsPage = lazy(() =>
+  import("./pages/AnalyticsReportsPage").then((m) => ({ default: m.AnalyticsReportsPage }))
+);
+const BeamsPage = lazy(() => import("./pages/BeamsPage").then((m) => ({ default: m.BeamsPage })));
+const DashboardPage = lazy(() => import("./pages/DashboardPage").then((m) => ({ default: m.DashboardPage })));
+const DeliveriesPage = lazy(() => import("./pages/DeliveriesPage").then((m) => ({ default: m.DeliveriesPage })));
+const InspectPage = lazy(() => import("./pages/InspectPage").then((m) => ({ default: m.InspectPage })));
+const LoginPage = lazy(() => import("./pages/LoginPage").then((m) => ({ default: m.LoginPage })));
+const PayrollPage = lazy(() => import("./pages/PayrollPage").then((m) => ({ default: m.PayrollPage })));
+const SettingsMastersPage = lazy(() =>
+  import("./pages/SettingsMastersPage").then((m) => ({ default: m.SettingsMastersPage }))
+);
+const SetupPage = lazy(() => import("./pages/SetupPage").then((m) => ({ default: m.SetupPage })));
+const TodayShiftPage = lazy(() => import("./pages/TodayShiftPage").then((m) => ({ default: m.TodayShiftPage })));
+
+function PageLoader() {
+  const { tr } = useAuth();
+  return (
+    <div className="min-h-[40vh] flex items-center justify-center text-xs text-slate-500">
+      {tr("Loading page...", "பக்கம் ஏற்றப்படுகிறது...")}
+    </div>
+  );
+}
 
 function AppRoutes() {
-  const { loading, backendError, setupStatus, user, t, refreshState } = useAuth();
+  const { loading, backendError, setupStatus, user, tr, refreshState } = useAuth();
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 text-sm text-slate-600">
-        Loading LOOMOS...
+        {tr("Loading LOOMOS...", "லூமோஸ் ஏற்றப்படுகிறது...")}
       </div>
     );
   }
@@ -29,16 +43,22 @@ function AppRoutes() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-100 p-4">
         <div className="max-w-md w-full bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-3 text-center">
-          <h1 className="text-base font-bold text-slate-900">Connecting to LOOMOS Backend...</h1>
+          <h1 className="text-base font-bold text-slate-900">
+            {tr("Connecting to LOOMOS Backend...", "LOOMOS சேவையகத்துடன் இணைக்கப்படுகிறது...")}
+          </h1>
           <p className="text-xs text-slate-600">
-            {backendError ?? "Server is still starting up. Wait a couple seconds and tap Retry."}
+            {backendError ??
+              tr(
+                "Server is still starting up. Wait a couple seconds and tap Retry.",
+                "சேவையகம் தொடங்கப்படுகிறது. சில விநாடிகள் காத்திருந்து மீண்டும் முயற்சிக்கவும்."
+              )}
           </p>
           <button
             type="button"
             onClick={() => void refreshState()}
-            className="px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold"
+            className="px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold cursor-pointer"
           >
-            Retry Connection
+            {tr("Retry Connection", "மீண்டும் இணைக்கவும்")}
           </button>
         </div>
       </div>
@@ -47,19 +67,23 @@ function AppRoutes() {
 
   if (!setupStatus.is_initialized) {
     return (
-      <Routes>
-        <Route path="/setup" element={<SetupPage />} />
-        <Route path="*" element={<Navigate to="/setup" replace />} />
-      </Routes>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/setup" element={<SetupPage />} />
+          <Route path="*" element={<Navigate to="/setup" replace />} />
+        </Routes>
+      </Suspense>
     );
   }
 
   if (!user) {
     return (
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </Suspense>
     );
   }
 
@@ -67,22 +91,24 @@ function AppRoutes() {
 
   return (
     <AppShell>
-      <Routes>
-        <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/today" element={<TodayShiftPage />} />
-        <Route path="/beams" element={<BeamsPage />} />
-        <Route path="/analytics" element={<AnalyticsReportsPage />} />
-        <Route path="/inspect" element={<InspectPage />} />
-        {user.role === "OWNER" && (
-          <>
-            <Route path="/payroll" element={<PayrollPage />} />
-            <Route path="/deliveries" element={<DeliveriesPage />} />
-            <Route path="/settings" element={<SettingsMastersPage />} />
-            <Route path="/audit-log" element={<AuditLogPage />} />
-          </>
-        )}
-        <Route path="*" element={<Navigate to={defaultRoute} replace />} />
-      </Routes>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/today" element={<TodayShiftPage />} />
+          <Route path="/beams" element={<BeamsPage />} />
+          <Route path="/analytics" element={<AnalyticsReportsPage />} />
+          <Route path="/inspect" element={<InspectPage />} />
+          {user.role === "OWNER" && (
+            <>
+              <Route path="/payroll" element={<PayrollPage />} />
+              <Route path="/deliveries" element={<DeliveriesPage />} />
+              <Route path="/settings" element={<SettingsMastersPage />} />
+              <Route path="/audit-log" element={<AuditLogPage />} />
+            </>
+          )}
+          <Route path="*" element={<Navigate to={defaultRoute} replace />} />
+        </Routes>
+      </Suspense>
     </AppShell>
   );
 }

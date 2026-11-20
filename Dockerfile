@@ -12,6 +12,7 @@ WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
+    TZ=Asia/Kolkata \
     LOOMOS_FRONTEND_DIST=/app/frontend/dist \
     PORT=8000
 

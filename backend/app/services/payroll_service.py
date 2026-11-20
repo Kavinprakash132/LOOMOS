@@ -166,20 +166,25 @@ def calculate_payroll_preview(
                 _add_bucket(r.wage_mode, r.rate_paise, weight, amt)
 
         elif mode == "FIXED_WEEKLY":
-            # Check absent deductions only if explicit ABSENT attendance isn't relevant; pay weekly prorated cleanly
+            # Prorate accurately per day across any mid-week wage rule change
             units_worked = (Decimal(period_days) / Decimal(7)).quantize(Decimal("0.01"))
             cur = period_start
             raw_sum = Decimal("0")
+            days_by_key: dict[tuple[str, int], int] = defaultdict(int)
+            raw_by_key: dict[tuple[str, int], Decimal] = defaultdict(lambda: Decimal("0"))
             while cur <= period_end:
                 r = resolve_wage_rule_for_date(w.wage_rules, cur) or end_rule
+                key = (r.wage_mode, r.rate_paise)
                 day_share = Decimal(r.rate_paise) / Decimal(7)
                 raw_sum += day_share
-                _add_bucket(r.wage_mode, r.rate_paise, Decimal("0.14"), 0)
+                days_by_key[key] += 1
+                raw_by_key[key] += day_share
                 cur += timedelta(days=1)
             gross_paise = int(raw_sum.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
-            for b in rule_breakdown.values():
-                b["units"] = units_worked
-                b["gross_paise"] = gross_paise
+            for (r_mode, r_paise), d_cnt in days_by_key.items():
+                sub_units = (Decimal(d_cnt) / Decimal(7)).quantize(Decimal("0.01"))
+                sub_gross = int(raw_by_key[(r_mode, r_paise)].quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+                _add_bucket(r_mode, r_paise, sub_units, sub_gross)
 
         adv_ded = min(gross_paise, open_adv_by_weaver[w.id]) if deduct_period_advances else 0
         def_ded = max(0, deductions_map.get(w.id, 0))

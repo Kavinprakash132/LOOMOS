@@ -229,15 +229,17 @@ def soft_delete_delivery(
         it.deleted_at = d.deleted_at
         it.deleted_by = owner.id
         it.delete_reason = payload.reason.strip()
+    trader = db.get(Trader, d.trader_id)
+    prefix = f"Challan {d.challan_no} ({trader.company_name}):" if trader else f"Challan {d.challan_no} ("
     matching_alerts = db.scalars(
         select(Alert).where(
             Alert.alert_type == "RATE_UNDERPAYMENT",
             Alert.status == "OPEN",
-            Alert.message.like(f"Challan {d.challan_no} (%"),
         )
     ).all()
     for al in matching_alerts:
-        al.status = "DISMISSED"
+        if al.message.startswith(prefix):
+            al.status = "DISMISSED"
     db.commit()
     return _hydrate_deliveries(db, [d])[0]
 
@@ -591,15 +593,20 @@ def soft_delete_eb_bill(
 # ---------------------------------------------------------------------------
 # Alerts (Dismissible, Explainable)
 # ---------------------------------------------------------------------------
+FINANCIAL_ALERT_TYPES = {"RATE_UNDERPAYMENT", "EB_OVERCHARGE", "EB_BILL"}
+
+
 @router.get("/alerts", response_model=list[AlertResponse])
 def list_alerts(
     status_filter: str | None = Query(default=None, alias="status"),
-    _user: Annotated[User, Depends(get_current_user)] = None,  # type: ignore[assignment]
+    user: Annotated[User, Depends(get_current_user)] = None,  # type: ignore[assignment]
     db: Annotated[Session, Depends(get_db)] = None,  # type: ignore[assignment]
 ) -> list[AlertResponse]:
     stmt = select(Alert).order_by(Alert.created_at.desc(), Alert.id.desc())
     if status_filter:
         stmt = stmt.where(Alert.status == status_filter)
+    if user.role != "OWNER":
+        stmt = stmt.where(Alert.alert_type.not_in(FINANCIAL_ALERT_TYPES))
     return [AlertResponse.model_validate(a) for a in db.scalars(stmt.limit(100)).all()]
 
 
@@ -613,6 +620,8 @@ def update_alert_status(
     alert = db.get(Alert, alert_id)
     if not alert:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Alert not found")
+    if user.role != "OWNER" and alert.alert_type in FINANCIAL_ALERT_TYPES:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Owner role required for financial alerts")
     old = snapshot_fields(alert, ["status"])
     alert.status = payload.status
     record_audit(

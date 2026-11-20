@@ -184,7 +184,7 @@ interface ExpansionSimResult {
 }
 
 export function AnalyticsReportsPage() {
-  const { user } = useAuth();
+  const { user, tr } = useAuth();
   const isOwner = user?.role === "OWNER";
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -351,10 +351,13 @@ export function AnalyticsReportsPage() {
       <div className="no-print">
         <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
           <TrendingUp className="w-5 h-5 text-amber-600" />
-          Shed Analytics, Beam ETAs, Reports &amp; Simulator
+          {tr("Shed Analytics, Beam ETAs, Reports & Simulator", "ஆலை பகுப்பாய்வு, பீம் ETA, அறிக்கை & விரிவாக்கம்")}
         </h1>
         <p className="text-xs text-slate-500">
-          Live Beam Finish ETAs, bi-monthly EB bill predictions, production anomaly alerts, Excel/Print statements, and expansion planning.
+          {tr(
+            "Live Beam Finish ETAs, bi-monthly EB bill predictions, production anomaly alerts, Excel/Print statements, and expansion planning.",
+            "பீம் முடியும் தேதி, இரு மாத EB பில் கணக்கு, உற்பத்தி கணிப்பு, எக்செல் அறிக்கைகள் மற்றும் விரிவாக்கத் திட்டம்."
+          )}
         </p>
       </div>
 
@@ -363,12 +366,24 @@ export function AnalyticsReportsPage() {
       <PageGuideBanner
         tip={
           tab === "eb"
-            ? "Check any TNPDCL EB bill by Units, Meter Readings, or Fabric Metres woven — and compare past EB bills against cloth produced to spot meter issues."
+            ? tr(
+                "Check any TNPDCL EB bill by Units, Meter Readings, or Fabric Metres woven — and compare past EB bills against cloth produced to spot meter issues.",
+                "யூனிட், மீட்டர் ரீடிங் அல்லது நெய்த துணி மீட்டரை வைத்து TNPDCL EB பில்லை கணக்கிடுங்கள் — பழைய பில்களையும் ஒப்பிடலாம்."
+              )
             : tab === "reports"
-              ? "Download your entire shed ledger as a 7-sheet Excel workbook or print a clean monthly account statement for any trader."
+              ? tr(
+                  "Download your entire shed ledger as a 7-sheet Excel workbook or print a clean monthly account statement for any trader.",
+                  "முழு ஆலை கணக்கை 7-தாள் எக்செல் கோப்பாகப் பதிவிறக்கவும் அல்லது வியாபாரி மாதாந்திர அறிக்கை அச்சிடவும்."
+                )
               : tab === "simulator"
-                ? "Test what your monthly profit, EB bill, and loan payment would look like if you expand to 20, 30, 50, or 100 shuttle looms."
-                : "See next week's expected cloth output, when each warp beam will finish, and any unusual loom drops — click 'Show' on the bottom card for thesis stats."
+                ? tr(
+                    "Test what your monthly profit, EB bill, and loan payment would look like if you expand to 20, 30, 50, or 100 shuttle looms.",
+                    "20, 30, 50 அல்லது 100 தறிகளாக விரிவுபடுத்தினால் மாத லாபம், EB பில் மற்றும் கடன் EMI எவ்வளவு வரும் எனக் கணக்கிடுங்கள்."
+                  )
+                : tr(
+                    "See next week's expected cloth output, when each warp beam will finish, and any unusual loom drops — click 'Show' on the bottom card for thesis stats.",
+                    "அடுத்த வார எதிர்பார்க்கப்படும் உற்பத்தி, ஒவ்வொரு பீமும் முடியும் தேதி மற்றும் தறி குறைவு எச்சரிக்கைகளைப் பாருங்கள்."
+                  )
         }
       />
 
@@ -380,7 +395,7 @@ export function AnalyticsReportsPage() {
             tab === "forecast" ? "bg-slate-900 text-white" : "bg-white border border-slate-200 text-slate-700"
           }`}
         >
-          1. Forecast, Beam ETA &amp; Anomalies
+          {tr("1. Forecast, Beam ETA & Anomalies", "1. கணிப்பு, பீம் ETA & எச்சரிக்கை")}
         </button>
         <button
           type="button"
@@ -389,7 +404,7 @@ export function AnalyticsReportsPage() {
             tab === "eb" ? "bg-slate-900 text-white" : "bg-white border border-slate-200 text-slate-700"
           }`}
         >
-          2. EB Bill &amp; Power Efficiency
+          {tr("2. EB Bill & Power Efficiency", "2. EB பில் & மின் திறன்")}
         </button>
         {isOwner && (
           <>
@@ -400,7 +415,7 @@ export function AnalyticsReportsPage() {
                 tab === "reports" ? "bg-slate-900 text-white" : "bg-white border border-slate-200 text-slate-700"
               }`}
             >
-              3. Excel (.xlsx) &amp; Print Statements
+              {tr("3. Excel (.xlsx) & Print Statements", "3. எக்செல் (.xlsx) & அறிக்கை")}
             </button>
             <button
               type="button"
@@ -409,7 +424,7 @@ export function AnalyticsReportsPage() {
                 tab === "simulator" ? "bg-slate-900 text-white" : "bg-white border border-slate-200 text-slate-700"
               }`}
             >
-              4. Loom Expansion Simulator (20–100 Looms)
+              {tr("4. Loom Expansion Simulator (20–100 Looms)", "4. தறி விரிவாக்கக் கணக்கீடு (20–100)")}
             </button>
           </>
         )}
@@ -424,17 +439,17 @@ export function AnalyticsReportsPage() {
               <div>
                 <h2 className="text-base font-bold flex items-center gap-1.5 text-slate-900">
                   <TrendingUp className="w-4 h-4 text-amber-600" />
-                  Next 7-Day Cloth Production Forecast
+                  {tr("Next 7-Day Cloth Production Forecast", "அடுத்த 7 நாள் துணி உற்பத்தி கணிப்பு")}
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  {formatDateDMY(overview.weekly_forecast.next_week_start)} to{" "}
+                  {formatDateDMY(overview.weekly_forecast.next_week_start)} –{" "}
                   {formatDateDMY(overview.weekly_forecast.next_week_end)} ·{" "}
-                  <b>{overview.weekly_forecast.planned_working_days}</b> working days (
-                  <b>{overview.weekly_forecast.planned_loom_shifts}</b> planned loom-shifts)
+                  <b>{overview.weekly_forecast.planned_working_days}</b> {tr("working days", "வேலை நாட்கள்")} (
+                  <b>{overview.weekly_forecast.planned_loom_shifts}</b> {tr("planned loom-shifts", "திட்டமிட்ட தறி-ஷிப்டுகள்")})
                 </p>
               </div>
               <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 text-right">
-                <div className="text-[11px] font-semibold text-amber-800">Expected Next 7 Days</div>
+                <div className="text-[11px] font-semibold text-amber-800">{tr("Expected Next 7 Days", "அடுத்த 7 நாள் எதிர்பார்ப்பு")}</div>
                 <div className="text-2xl font-extrabold text-amber-950">
                   {overview.weekly_forecast.recommended_forecast_m} m
                 </div>
@@ -442,17 +457,23 @@ export function AnalyticsReportsPage() {
             </div>
 
             <TechnicalDetailsToggle
-              title="Show Forecast Model Backtest (CN-MA vs Holt vs Naive — Thesis Details)"
-              subtitle={`Active winner: ${overview.weekly_forecast.winner_model} · 5-week walk-forward MAE & MAPE accuracy`}
+              title={tr(
+                "Show Forecast Model Backtest (CN-MA vs Holt vs Naive — Thesis Details)",
+                "கணிப்பு மாடல் ஒப்பீடு (CN-MA vs Holt vs Naive — ஆராய்ச்சி விவரம்)"
+              )}
+              subtitle={tr(
+                `Active winner: ${overview.weekly_forecast.winner_model} · 5-week walk-forward MAE & MAPE accuracy`,
+                `சிறந்த மாடல்: ${overview.weekly_forecast.winner_model} · 5-வார MAE & MAPE துல்லியம்`
+              )}
             >
               <div className="grid md:grid-cols-2 gap-4 overflow-x-auto">
                 <table className="w-full text-xs text-left">
                   <thead className="border-b border-slate-200 text-slate-500">
                     <tr>
-                      <th className="py-1.5 pr-2">Week</th>
-                      <th className="py-1.5 pr-2">Dates</th>
-                      <th className="py-1.5 pr-2">Shifts</th>
-                      <th className="py-1.5">Woven (m)</th>
+                      <th className="py-1.5 pr-2">{tr("Week", "வாரம்")}</th>
+                      <th className="py-1.5 pr-2">{tr("Dates", "தேதிகள்")}</th>
+                      <th className="py-1.5 pr-2">{tr("Shifts", "ஷிப்டுகள்")}</th>
+                      <th className="py-1.5">{tr("Woven (m)", "நெய்தது (மீ)")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -472,17 +493,17 @@ export function AnalyticsReportsPage() {
                 <table className="w-full text-xs text-left">
                   <thead className="border-b border-slate-200 text-slate-500">
                     <tr>
-                      <th className="py-1.5 pr-2">Forecast Method</th>
-                      <th className="py-1.5 pr-2">Backtest MAE</th>
+                      <th className="py-1.5 pr-2">{tr("Forecast Method", "கணிப்பு முறை")}</th>
+                      <th className="py-1.5 pr-2">MAE</th>
                       <th className="py-1.5 pr-2">MAPE %</th>
-                      <th className="py-1.5">Next 7d Target</th>
+                      <th className="py-1.5">{tr("Next 7d Target", "அடுத்த 7 நாள்")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {overview.weekly_forecast.models.map((m) => (
                       <tr key={m.model} className={m.is_winner ? "bg-emerald-50/60 font-semibold" : ""}>
                         <td className="py-1.5 pr-2">
-                          {m.model} {m.is_winner && <span className="text-[10px] text-emerald-700">(Lowest Error)</span>}
+                          {m.model} {m.is_winner && <span className="text-[10px] text-emerald-700">({tr("Lowest Error", "குறைந்த பிழை")})</span>}
                         </td>
                         <td className="py-1.5 pr-2">{m.mae_m} m</td>
                         <td className="py-1.5 pr-2">{m.mape_pct}%</td>
@@ -499,17 +520,17 @@ export function AnalyticsReportsPage() {
           <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-2 overflow-x-auto">
             <h2 className="text-sm font-bold flex items-center gap-1.5">
               <CalendarClock className="w-4 h-4 text-amber-600" />
-              When Will Each Warp Beam Finish? ({overview.beam_etas.length} Running)
+              {tr(`When Will Each Warp Beam Finish? (${overview.beam_etas.length} Running)`, `ஒவ்வொரு பாவு பீமும் எப்போது முடியும்? (${overview.beam_etas.length} ஓடுகிறது)`)}
             </h2>
             <table className="w-full text-xs text-left">
               <thead className="border-b border-slate-200 text-slate-500">
                 <tr>
-                  <th className="py-1.5 pr-2">Beam &amp; Loom</th>
-                  <th className="py-1.5 pr-2">Cloth Left</th>
-                  <th className="py-1.5 pr-2">Avg Daily Weaving</th>
-                  <th className="py-1.5 pr-2">Expected Finish</th>
-                  <th className="py-1.5 pr-2">Target Due</th>
-                  <th className="py-1.5">On Time?</th>
+                  <th className="py-1.5 pr-2">{tr("Beam & Loom", "பீம் & தறி")}</th>
+                  <th className="py-1.5 pr-2">{tr("Cloth Left", "மீதி துணி")}</th>
+                  <th className="py-1.5 pr-2">{tr("Avg Daily Weaving", "தினசரி சராசரி")}</th>
+                  <th className="py-1.5 pr-2">{tr("Expected Finish", "முடியும் தேதி")}</th>
+                  <th className="py-1.5 pr-2">{tr("Target Due", "இலக்கு தேதி")}</th>
+                  <th className="py-1.5">{tr("On Time?", "நேரத்திற்கு?")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -520,13 +541,13 @@ export function AnalyticsReportsPage() {
                     </td>
                     <td className="py-1.5 pr-2">{b.remaining_m} m</td>
                     <td className="py-1.5 pr-2">
-                      <b>{b.p50_daily_m} m/day</b>{" "}
+                      <b>{b.p50_daily_m} m/{tr("day", "நாள்")}</b>{" "}
                       <span className="text-[10px] text-slate-400">
                         ({b.p25_daily_m}–{b.p75_daily_m})
                       </span>
                     </td>
                     <td className="py-1.5 pr-2 font-semibold">
-                      {formatDateDMY(b.eta_date_p50)} ({b.working_days_left_p50} work days)
+                      {formatDateDMY(b.eta_date_p50)} ({b.working_days_left_p50} {tr("work days", "நாட்கள்")})
                     </td>
                     <td className="py-1.5 pr-2">{b.due_date ? formatDateDMY(b.due_date) : "-"}</td>
                     <td className="py-1.5">
@@ -536,10 +557,12 @@ export function AnalyticsReportsPage() {
                             b.on_track ? "bg-emerald-100 text-emerald-800" : "bg-rose-100 text-rose-800"
                           }`}
                         >
-                          {b.on_track ? `On Track (${b.days_variance}d early)` : `Late (${b.days_variance}d)`}
+                          {b.on_track
+                            ? tr(`On Track (${b.days_variance}d early)`, `சரியான வேகம் (${b.days_variance} நாள் முன்பு)`)
+                            : tr(`Late (${b.days_variance}d)`, `தாமதம் (${b.days_variance} நாள்)`)}
                         </span>
                       ) : (
-                        <span className="text-slate-400">No due date</span>
+                        <span className="text-slate-400">{tr("No due date", "இலக்கு இல்லை")}</span>
                       )}
                     </td>
                   </tr>
@@ -552,10 +575,15 @@ export function AnalyticsReportsPage() {
           <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-2">
             <h2 className="text-sm font-bold flex items-center gap-1.5">
               <AlertTriangle className="w-4 h-4 text-rose-600" />
-              Unusual Loom Drops &amp; Speed Alerts (Last 30 Days — {overview.anomalies.length})
+              {tr(`Unusual Loom Drops & Speed Alerts (Last 30 Days — ${overview.anomalies.length})`, `அசாதாரண தறி குறைவு & வேக எச்சரிக்கைகள் (30 நாட்கள் — ${overview.anomalies.length})`)}
             </h2>
             {overview.anomalies.length === 0 ? (
-              <div className="text-xs text-emerald-700">All looms ran normally with no unusual output spikes or sudden drops in the past 30 days.</div>
+              <div className="text-xs text-emerald-700">
+                {tr(
+                  "All looms ran normally with no unusual output spikes or sudden drops in the past 30 days.",
+                  "கடந்த 30 நாட்களில் எல்லா தறிகளும் சீராக ஓடின — அசாதாரண குறைவு எதுவும் இல்லை."
+                )}
+              </div>
             ) : (
               <div className="divide-y divide-slate-100 text-xs">
                 {overview.anomalies.map((a) => (
@@ -566,9 +594,9 @@ export function AnalyticsReportsPage() {
                           a.severity === "CRITICAL" ? "bg-rose-100 text-rose-800" : "bg-amber-100 text-amber-800"
                         }`}
                       >
-                        {a.kind === "PHYSICAL_CAP" ? "Speed Check" : "Low Output"}
+                        {a.kind === "PHYSICAL_CAP" ? tr("Speed Check", "வேக சரிபார்ப்பு") : tr("Low Output", "குறைந்த உற்பத்தி")}
                       </span>
-                      <b>{a.loom_number}</b> on {formatDateDMY(a.entry_date)} (Shift {a.shift_no}): {a.reason}
+                      <b>{a.loom_number}</b> ({formatDateDMY(a.entry_date)} · {tr(`Shift ${a.shift_no}`, `ஷிப்ட் ${a.shift_no}`)}): {a.reason}
                     </span>
                   </div>
                 ))}
@@ -585,28 +613,28 @@ export function AnalyticsReportsPage() {
             <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
               <h2 className="text-sm font-bold flex items-center gap-1.5">
                 <Zap className="w-4 h-4 text-amber-600" />
-                Next Bi-Monthly EB Bill Predictor ({overview.eb_prediction.billing_cycle_days}-Day Cycle)
+                {tr(`Next Bi-Monthly EB Bill Predictor (${overview.eb_prediction.billing_cycle_days}-Day Cycle)`, `அடுத்த இரு மாத EB பில் கணிப்பு (${overview.eb_prediction.billing_cycle_days} நாட்கள்)`)}
               </h2>
               <p className="text-xs text-slate-500">
-                Tariff: <b>{overview.eb_prediction.tariff_name}</b> · Load {overview.eb_prediction.sanctioned_kw} kW ·{" "}
+                {tr("Tariff", "கட்டணத் திட்டம்")}: <b>{overview.eb_prediction.tariff_name}</b> · {tr("Load", "மின் சுமை")} {overview.eb_prediction.sanctioned_kw} kW ·{" "}
                 {overview.eb_prediction.slab_note}
               </p>
               <div className="grid grid-cols-2 gap-2.5 text-xs">
                 <div className="bg-slate-50 p-3 rounded-lg">
-                  <div className="text-slate-500">Projected Units</div>
+                  <div className="text-slate-500">{tr("Projected Units", "எதிர்பார்க்கப்படும் யூனிட்")}</div>
                   <div className="text-lg font-bold">{overview.eb_prediction.projected_units_kwh} kWh</div>
                 </div>
                 <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg">
-                  <div className="text-amber-900">Estimated Total Bill</div>
+                  <div className="text-amber-900">{tr("Estimated Total Bill", "எதிர்பார்க்கப்படும் மொத்த பில்")}</div>
                   <div className="text-lg font-bold text-amber-900">
                     {formatRupeesFromPaise(overview.eb_prediction.projected_net_bill_paise)}
                   </div>
                 </div>
                 <div className="bg-slate-50 p-2.5 rounded-lg">
-                  Energy Slab Charge: <b>{formatRupeesFromPaise(overview.eb_prediction.energy_paise)}</b>
+                  {tr("Energy Slab Charge", "யூனிட் கட்டணம்")}: <b>{formatRupeesFromPaise(overview.eb_prediction.energy_paise)}</b>
                 </div>
                 <div className="bg-slate-50 p-2.5 rounded-lg">
-                  Fixed + FPPCA + Tax:{" "}
+                  {tr("Fixed + FPPCA + Tax", "நிலை + FPPCA + வரி")}:{" "}
                   <b>
                     {formatRupeesFromPaise(
                       overview.eb_prediction.fixed_paise +
@@ -619,18 +647,18 @@ export function AnalyticsReportsPage() {
             </div>
 
             <div className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
-              <h2 className="text-sm font-bold">30-Day Stoppage &amp; Power-Outage Opportunity Loss</h2>
+              <h2 className="text-sm font-bold">{tr("30-Day Stoppage & Power-Outage Opportunity Loss", "30 நாள் நிறுத்தம் & மின்வெட்டு இழப்பு")}</h2>
               <div className="grid grid-cols-3 gap-2.5 text-xs">
                 <div className="bg-slate-50 p-3 rounded-lg">
-                  <div className="text-slate-500">Stopped Time</div>
+                  <div className="text-slate-500">{tr("Stopped Time", "நின்ற நேரம்")}</div>
                   <div className="text-lg font-bold">{overview.eb_prediction.outage_30d_stopped_hrs} hrs</div>
                 </div>
                 <div className="bg-slate-50 p-3 rounded-lg">
-                  <div className="text-slate-500">Est. Lost Cloth</div>
+                  <div className="text-slate-500">{tr("Est. Lost Cloth", "இழந்த துணி")}</div>
                   <div className="text-lg font-bold">{overview.eb_prediction.outage_30d_lost_metres} m</div>
                 </div>
                 <div className="bg-rose-50 border border-rose-200 p-3 rounded-lg">
-                  <div className="text-rose-800">Est. Lost Revenue</div>
+                  <div className="text-rose-800">{tr("Est. Lost Revenue", "இழந்த வருமானம்")}</div>
                   <div className="text-lg font-bold text-rose-800">
                     {formatRupeesFromPaise(overview.eb_prediction.outage_30d_lost_revenue_paise)}
                   </div>
@@ -645,10 +673,13 @@ export function AnalyticsReportsPage() {
               <div>
                 <h2 className="text-sm font-bold flex items-center gap-1.5">
                   <Calculator className="w-4 h-4 text-amber-600" />
-                  TNPDCL EB Bill Calculator (Live Slab Working Sheet)
+                  {tr("TNPDCL EB Bill Calculator (Live Slab Working Sheet)", "TNPDCL EB பில் கணக்கீட்டாளர் (நேரடி அட்டவணை)")}
                 </h2>
                 <p className="text-xs text-slate-500">
-                  Uses your active tariff plan ({overview.eb_prediction.tariff_name}). Enter total kWh or meter readings to verify any EB bill down to the rupee.
+                  {tr(
+                    `Uses your active tariff plan (${overview.eb_prediction.tariff_name}). Enter total kWh, meter readings, or fabric metres to check any EB bill.`,
+                    `உங்கள் செயலில் உள்ள திட்டம் (${overview.eb_prediction.tariff_name}). யூனிட், மீட்டர் ரீடிங் அல்லது துணி மீட்டரை உள்ளிட்டு EB பில்லைச் சரிபார்க்கவும்.`
+                  )}
                 </p>
               </div>
               <div className="flex flex-wrap rounded-lg border border-slate-200 overflow-hidden text-xs font-semibold">
@@ -662,7 +693,7 @@ export function AnalyticsReportsPage() {
                     calcMode === "units" ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50"
                   }`}
                 >
-                  Total Units (kWh)
+                  {tr("Total Units (kWh)", "மொத்த யூனிட் (kWh)")}
                 </button>
                 <button
                   type="button"
@@ -674,7 +705,7 @@ export function AnalyticsReportsPage() {
                     calcMode === "readings" ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50"
                   }`}
                 >
-                  EB Meter (Prev → Curr)
+                  {tr("EB Meter (Prev → Curr)", "EB மீட்டர் (பழைய → புதிய)")}
                 </button>
                 <button
                   type="button"
@@ -686,7 +717,7 @@ export function AnalyticsReportsPage() {
                     calcMode === "metres" ? "bg-slate-900 text-white" : "bg-white text-slate-600 hover:bg-slate-50"
                   }`}
                 >
-                  By Fabric Metres (m)
+                  {tr("By Fabric Metres (m)", "துணி மீட்டர் படி (m)")}
                 </button>
               </div>
             </div>
@@ -695,7 +726,7 @@ export function AnalyticsReportsPage() {
               {calcMode === "units" && (
                 <>
                   <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Units Consumed (kWh)</label>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">{tr("Units Consumed (kWh)", "பயன்படுத்திய யூனிட் (kWh)")}</label>
                     <input
                       type="number"
                       min={0}
@@ -707,7 +738,7 @@ export function AnalyticsReportsPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Fabric Metres (m, opt.)</label>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">{tr("Fabric Metres (m, opt.)", "துணி மீட்டர் (விருப்பம்)")}</label>
                     <input
                       type="number"
                       min={0}
@@ -724,7 +755,7 @@ export function AnalyticsReportsPage() {
               {calcMode === "readings" && (
                 <>
                   <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Previous Reading (kWh)</label>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">{tr("Previous Reading (kWh)", "முந்தைய ரீடிங் (kWh)")}</label>
                     <input
                       type="number"
                       min={0}
@@ -734,7 +765,7 @@ export function AnalyticsReportsPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Current Reading (kWh)</label>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">{tr("Current Reading (kWh)", "தற்போதைய ரீடிங் (kWh)")}</label>
                     <input
                       type="number"
                       min={0}
@@ -747,7 +778,7 @@ export function AnalyticsReportsPage() {
                     = {Math.max(0, (parseFloat(calcCurrRead) || 0) - (parseFloat(calcPrevRead) || 0)).toLocaleString("en-IN")} kWh
                   </div>
                   <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Fabric Metres (m, opt.)</label>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">{tr("Fabric Metres (m, opt.)", "துணி மீட்டர் (விருப்பம்)")}</label>
                     <input
                       type="number"
                       min={0}
@@ -764,7 +795,7 @@ export function AnalyticsReportsPage() {
               {calcMode === "metres" && (
                 <>
                   <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Fabric Metres Produced (m)</label>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">{tr("Fabric Metres Produced (m)", "உற்பத்தி செய்த துணி (மீட்டர்)")}</label>
                     <input
                       type="number"
                       min={0}
@@ -776,7 +807,7 @@ export function AnalyticsReportsPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Power Rate (kWh / m)</label>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">{tr("Power Rate (kWh / m)", "மின்சாரம் (kWh / மீ)")}</label>
                     <input
                       type="number"
                       min={0.01}
@@ -788,7 +819,7 @@ export function AnalyticsReportsPage() {
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">Job Rate (₹ / m)</label>
+                    <label className="block text-[11px] font-semibold text-slate-600 mb-1">{tr("Job Rate (₹ / m)", "நெசவு கூலி (₹ / மீ)")}</label>
                     <input
                       type="number"
                       min={0.5}
@@ -805,7 +836,7 @@ export function AnalyticsReportsPage() {
               )}
 
               <div>
-                <label className="block text-[11px] font-semibold text-slate-600 mb-1">Sanctioned Load (kW)</label>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">{tr("Sanctioned Load (kW)", "அனுமதி மின் சுமை (kW)")}</label>
                 <input
                   type="number"
                   min={1}
@@ -816,19 +847,19 @@ export function AnalyticsReportsPage() {
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-semibold text-slate-600 mb-1">Recorded Demand (kW, opt.)</label>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">{tr("Recorded Demand (kW, opt.)", "பதிவு டிமாண்ட் (kW)")}</label>
                 <input
                   type="number"
                   min={0}
                   step={0.01}
-                  placeholder="Auto"
+                  placeholder={tr("Auto", "தானாக")}
                   value={calcDemandKw}
                   onChange={(e) => setCalcDemandKw(e.target.value)}
                   className="w-28 border border-slate-300 rounded-lg px-2.5 py-1.5"
                 />
               </div>
               <div>
-                <label className="block text-[11px] font-semibold text-slate-600 mb-1">Cycle Days</label>
+                <label className="block text-[11px] font-semibold text-slate-600 mb-1">{tr("Cycle Days", "நாட்கள்")}</label>
                 <input
                   type="number"
                   min={1}
@@ -843,12 +874,12 @@ export function AnalyticsReportsPage() {
                 onClick={() => void runEbCalc()}
                 className="px-4 py-1.5 rounded-lg bg-amber-500 text-slate-950 font-bold hover:bg-amber-400 cursor-pointer"
               >
-                Calculate EB Bill
+                {tr("Calculate EB Bill", "EB பில் கணக்கிடு")}
               </button>
             </div>
 
             <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-              <span className="text-slate-500 font-medium">Quick Test:</span>
+              <span className="text-slate-500 font-medium">{tr("Quick Test:", "விரைவு சோதனை:")}</span>
               {calcMode === "metres"
                 ? [30000, 40000, 50000, 55000, 60000].map((mVal) => (
                     <button
@@ -861,7 +892,7 @@ export function AnalyticsReportsPage() {
                     </button>
                   ))
                 : [
-                    { u: 79, label: "79 kWh (Free)" },
+                    { u: 79, label: tr("79 kWh (Free)", "79 kWh (இலவசம்)") },
                     { u: 1828, label: "1,828 kWh" },
                     { u: 4346, label: "4,346 kWh" },
                     { u: 6361, label: "6,361 kWh" },
@@ -884,19 +915,19 @@ export function AnalyticsReportsPage() {
                   <table className="w-full text-xs text-left">
                     <thead className="border-b border-slate-200 text-slate-500">
                       <tr>
-                        <th className="py-1.5 pr-2">Slab</th>
-                        <th className="py-1.5 pr-2">Unit Range</th>
-                        <th className="py-1.5 pr-2">Units</th>
-                        <th className="py-1.5 pr-2">Rate</th>
-                        <th className="py-1.5 text-right">Amount</th>
+                        <th className="py-1.5 pr-2">{tr("Slab", "அடுக்கு")}</th>
+                        <th className="py-1.5 pr-2">{tr("Unit Range", "யூனிட் வரம்பு")}</th>
+                        <th className="py-1.5 pr-2">{tr("Units", "யூனிட்")}</th>
+                        <th className="py-1.5 pr-2">{tr("Rate", "விலை")}</th>
+                        <th className="py-1.5 text-right">{tr("Amount", "தொகை")}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {calcResult.slabs.map((s) => (
                         <tr key={s.slab_no}>
-                          <td className="py-1.5 pr-2 font-semibold">Slab {s.slab_no}</td>
+                          <td className="py-1.5 pr-2 font-semibold">{tr(`Slab ${s.slab_no}`, `அடுக்கு ${s.slab_no}`)}</td>
                           <td className="py-1.5 pr-2">
-                            {s.from_unit} – {s.to_unit ?? "Above"}
+                            {s.from_unit} – {s.to_unit ?? tr("Above", "மேல்")}
                           </td>
                           <td className="py-1.5 pr-2">{s.units_in_slab.toLocaleString("en-IN")}</td>
                           <td className="py-1.5 pr-2">{formatRupeesFromPaise(s.rate_paise_per_unit)}/u</td>
@@ -909,21 +940,21 @@ export function AnalyticsReportsPage() {
 
                 <div className="grid grid-cols-2 gap-2 text-xs content-start">
                   <div className="bg-slate-50 p-2.5 rounded-lg">
-                    <div className="text-slate-500">CC (Energy) Charge</div>
+                    <div className="text-slate-500">{tr("CC (Energy) Charge", "மின்சார கட்டணம் (CC)")}</div>
                     <div className="text-sm font-bold">{formatRupeesFromPaise(calcResult.energy_paise)}</div>
                   </div>
                   <div className="bg-slate-50 p-2.5 rounded-lg">
-                    <div className="text-slate-500">Fixed Charge ({calcResult.sanctioned_kw} kW)</div>
+                    <div className="text-slate-500">{tr("Fixed Charge", "நிலை கட்டணம்")} ({calcResult.sanctioned_kw} kW)</div>
                     <div className="text-sm font-bold">{formatRupeesFromPaise(calcResult.fixed_paise)}</div>
                   </div>
                   <div className="bg-slate-50 p-2.5 rounded-lg">
-                    <div className="text-slate-500">Electricity Tax + FPPCA</div>
+                    <div className="text-slate-500">{tr("Electricity Tax + FPPCA", "மின் வரி + FPPCA")}</div>
                     <div className="text-sm font-bold">
                       {formatRupeesFromPaise(calcResult.tax_paise + calcResult.fppca_paise)}
                     </div>
                   </div>
                   <div className="bg-slate-50 p-2.5 rounded-lg">
-                    <div className="text-slate-500">Effective Rate / Unit</div>
+                    <div className="text-slate-500">{tr("Effective Rate / Unit", "ஒரு யூனிட் சராசரி")}</div>
                     <div className="text-sm font-bold">{formatRupeesFromPaise(calcResult.avg_paise_per_kwh)} / kWh</div>
                   </div>
                   <div
@@ -936,10 +967,13 @@ export function AnalyticsReportsPage() {
                     <div>
                       <div className="text-[11px] font-semibold">
                         {calcResult.free_quota_applied
-                          ? "Free Quota Applied (≤ 1,000 units — Fixed & E-Tax Waived)"
-                          : `Payable EB Bill (${calcResult.units_kwh.toLocaleString("en-IN")} kWh · ${calcResult.billing_days}d)`}
+                          ? tr("Free Quota Applied (≤ 1,000 units — Fixed & E-Tax Waived)", "இலவச மின்சாரம் (≤ 1,000 யூனிட் — கட்டணம் இல்லை)")
+                          : tr(
+                              `Payable EB Bill (${calcResult.units_kwh.toLocaleString("en-IN")} kWh · ${calcResult.billing_days}d)`,
+                              `செலுத்த வேண்டிய EB பில் (${calcResult.units_kwh.toLocaleString("en-IN")} kWh · ${calcResult.billing_days} நாள்)`
+                            )}
                       </div>
-                      <div className="text-[11px] opacity-75">Exact: {formatRupeesFromPaise(calcResult.net_bill_paise)}</div>
+                      <div className="text-[11px] opacity-75">{tr("Exact", "துல்லியம்")}: {formatRupeesFromPaise(calcResult.net_bill_paise)}</div>
                     </div>
                     <div className="text-xl font-extrabold">
                       ₹{calcResult.rounded_payable_rupees.toLocaleString("en-IN")}
@@ -948,21 +982,21 @@ export function AnalyticsReportsPage() {
                   {calcActiveMetres && calcActiveMetres > 0 && (
                     <div className="col-span-2 p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-950 flex flex-wrap items-center justify-between gap-2 text-[11px]">
                       <span>
-                        <b>{calcActiveMetres.toLocaleString("en-IN")} m</b> woven ·{" "}
+                        <b>{calcActiveMetres.toLocaleString("en-IN")} m</b> {tr("woven", "நெய்தது")} ·{" "}
                         <b>{(calcResult.units_kwh / calcActiveMetres).toFixed(3)} kWh/m</b> ·{" "}
                         <b>
                           {calcResult.units_kwh > 0 ? (calcActiveMetres / calcResult.units_kwh).toFixed(2) : "0"} m/kWh
                         </b>
                       </span>
                       <span className="font-bold">
-                        EB Cost: ₹{(calcResult.net_bill_paise / 100 / calcActiveMetres).toFixed(2)}/m (
+                        {tr("EB Cost", "EB செலவு")}: ₹{(calcResult.net_bill_paise / 100 / calcActiveMetres).toFixed(2)}/m (
                         {(
                           (calcResult.net_bill_paise /
                             100 /
                             Math.max(1, calcActiveMetres * (parseFloat(calcClothRateRs) || 6.0))) *
                           100
                         ).toFixed(1)}
-                        % of ₹{parseFloat(calcClothRateRs) || 6}/m revenue)
+                        % {tr(`of ₹${parseFloat(calcClothRateRs) || 6}/m revenue`, `வருமானத்தில் (₹${parseFloat(calcClothRateRs) || 6}/மீ)`)})
                       </span>
                     </div>
                   )}
@@ -978,62 +1012,67 @@ export function AnalyticsReportsPage() {
                 <div>
                   <h2 className="text-sm font-bold flex items-center gap-1.5">
                     <Zap className="w-4 h-4 text-emerald-600" />
-                    EB Bill vs. Metres Produced (Power Efficiency &amp; Meter Health)
+                    {tr("EB Bill vs. Metres Produced (Power Efficiency & Meter Health)", "EB பில் vs நெய்த துணி (மின் திறன் & மீட்டர் நிலை)")}
                   </h2>
                   <p className="text-xs text-slate-500">
-                    Matches each EB billing period against cloth woven (Daily Shifts or Deliveries) to track kWh/m, EB cost per metre, and catch faulty/under-reading meters.
+                    {tr(
+                      "Matches each EB billing period against cloth woven (Daily Shifts or Deliveries) to track kWh/m, EB cost per metre, and catch faulty/under-reading meters.",
+                      "ஒவ்வொரு EB காலத்தையும் நெய்த துணியுடன் ஒப்பிட்டு ஒரு மீட்டருக்கு EB செலவு & மீட்டர் கோளாறை கண்டறியும்."
+                    )}
                   </p>
                 </div>
                 <span className="px-2.5 py-1 rounded bg-slate-100 text-slate-700 text-[11px] font-semibold">
-                  Baseline: {overview.eb_efficiency.baseline_kwh_per_metre} kWh/m
+                  {tr("Baseline", "அடிப்படை")}: {overview.eb_efficiency.baseline_kwh_per_metre} kWh/m
                 </span>
               </div>
 
               <div className="grid sm:grid-cols-3 gap-2.5 text-xs">
                 <div className="bg-slate-50 p-3 rounded-lg">
-                  <div className="text-slate-500">Avg Power per Metre</div>
+                  <div className="text-slate-500">{tr("Avg Power per Metre", "சராசரி மின்சாரம் / மீ")}</div>
                   <div className="text-lg font-bold">
                     {overview.eb_efficiency.avg_kwh_per_metre !== null
                       ? `${overview.eb_efficiency.avg_kwh_per_metre} kWh/m`
-                      : "Pending paired data"}
+                      : tr("Pending paired data", "தரவு தேவை")}
                   </div>
                 </div>
                 <div className="bg-slate-50 p-3 rounded-lg">
-                  <div className="text-slate-500">Avg Cloth per Unit</div>
+                  <div className="text-slate-500">{tr("Avg Cloth per Unit", "ஒரு யூனிட்டுக்கு துணி")}</div>
                   <div className="text-lg font-bold">
                     {overview.eb_efficiency.avg_metres_per_kwh !== null
                       ? `${overview.eb_efficiency.avg_metres_per_kwh} m/kWh`
-                      : "Pending paired data"}
+                      : tr("Pending paired data", "தரவு தேவை")}
                   </div>
                 </div>
                 <div className="bg-emerald-50 border border-emerald-200 p-3 rounded-lg">
-                  <div className="text-emerald-900">Avg EB Cost per Metre</div>
+                  <div className="text-emerald-900">{tr("Avg EB Cost per Metre", "ஒரு மீட்டர் EB செலவு")}</div>
                   <div className="text-lg font-bold text-emerald-900">
                     {overview.eb_efficiency.avg_eb_paise_per_metre !== null
                       ? `${formatRupeesFromPaise(overview.eb_efficiency.avg_eb_paise_per_metre)} / m`
-                      : "Pending paired data"}
+                      : tr("Pending paired data", "தரவு தேவை")}
                   </div>
                 </div>
               </div>
 
-              {/* Period-by-period comparison table */}
               <div className="overflow-x-auto">
                 {overview.eb_efficiency.periods.length === 0 ? (
                   <div className="text-xs text-slate-500 py-2">
-                    No EB bills recorded yet. Add bi-monthly EB bills under Deliveries &amp; EB to compare against cloth produced.
+                    {tr(
+                      "No EB bills recorded yet. Add bi-monthly EB bills under Deliveries & EB to compare against cloth produced.",
+                      "இன்னும் EB பில்கள் பதிவு செய்யப்படவில்லை. டெலிவரி & EB பக்கத்தில் பில்களைச் சேர்க்கவும்."
+                    )}
                   </div>
                 ) : (
                   <table className="w-full text-xs text-left">
                     <thead className="border-b border-slate-200 text-slate-500">
                       <tr>
-                        <th className="py-1.5 pr-2">EB Billing Period</th>
-                        <th className="py-1.5 pr-2">Metres Woven</th>
-                        <th className="py-1.5 pr-2">EB Units</th>
-                        <th className="py-1.5 pr-2">EB Bill</th>
+                        <th className="py-1.5 pr-2">{tr("EB Billing Period", "EB காலம்")}</th>
+                        <th className="py-1.5 pr-2">{tr("Metres Woven", "நெய்த மீட்டர்")}</th>
+                        <th className="py-1.5 pr-2">{tr("EB Units", "EB யூனிட்")}</th>
+                        <th className="py-1.5 pr-2">{tr("EB Bill", "EB பில்")}</th>
                         <th className="py-1.5 pr-2">kWh / m</th>
                         <th className="py-1.5 pr-2">m / kWh</th>
-                        <th className="py-1.5 pr-2">EB Cost / m</th>
-                        <th className="py-1.5">Meter Health</th>
+                        <th className="py-1.5 pr-2">{tr("EB Cost / m", "EB செலவு / மீ")}</th>
+                        <th className="py-1.5">{tr("Meter Health", "மீட்டர் நிலை")}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -1047,7 +1086,7 @@ export function AnalyticsReportsPage() {
                             {p.metres_produced > 0 ? `${p.metres_produced.toLocaleString("en-IN")} m` : "-"}{" "}
                             {p.metres_source !== "NONE" && (
                               <span className="text-[10px] text-slate-400">
-                                ({p.metres_source === "SHIFTS" ? "Shifts" : "Deliveries"})
+                                ({p.metres_source === "SHIFTS" ? tr("Shifts", "ஷிப்ட்") : tr("Deliveries", "டெலிவரி")})
                               </span>
                             )}
                           </td>
@@ -1072,12 +1111,12 @@ export function AnalyticsReportsPage() {
                               }`}
                             >
                               {p.status_flag === "NORMAL"
-                                ? "Normal"
+                                ? tr("Normal", "சீராக")
                                 : p.status_flag === "METER_UNDER_READING"
-                                  ? "Meter Under-Reading"
+                                  ? tr("Meter Under-Reading", "மீட்டர் குறைவாக காட்டுகிறது")
                                   : p.status_flag === "HIGH_POWER_USAGE"
-                                    ? "High Power Usage"
-                                    : "No Metres"}
+                                    ? tr("High Power Usage", "அதிக மின்சாரம்")
+                                    : tr("No Metres", "மீட்டர் இல்லை")}
                             </span>
                           </td>
                         </tr>
@@ -1087,24 +1126,26 @@ export function AnalyticsReportsPage() {
                 )}
               </div>
 
-              {/* Helpful cross-page shortcuts instead of duplicate estimator */}
               <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
                 <span className="text-slate-500">
-                  Missing metres on a past EB bill? Log daily shifts or add/import your weekly delivery challans to auto-fill these rows.
+                  {tr(
+                    "Missing metres on a past EB bill? Log daily shifts or add/import your weekly delivery challans to auto-fill these rows.",
+                    "பழைய EB பிலுக்கு மீட்டர் இல்லையா? தினசரி ஷிப்ட் அல்லது வார டெலிவரி சலான்களைச் சேர்க்கவும்."
+                  )}
                 </span>
                 <div className="flex flex-wrap gap-2">
                   <Link
                     to="/today"
                     className="px-3 py-1.5 rounded-lg bg-slate-900 text-white font-semibold hover:bg-slate-800"
                   >
-                    + Log Daily Shift →
+                    {tr("+ Log Daily Shift →", "+ தினசரி ஷிப்ட் பதிவு →")}
                   </Link>
                   {isOwner && (
                     <Link
                       to="/deliveries"
                       className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-800 font-semibold hover:bg-slate-50"
                     >
-                      Add Deliveries / EB Bills →
+                      {tr("Add Deliveries / EB Bills →", "டெலிவரி / EB பில் சேர் →")}
                     </Link>
                   )}
                 </div>
@@ -1119,13 +1160,13 @@ export function AnalyticsReportsPage() {
         <div className="space-y-4">
           <div className="bg-white p-4 rounded-xl border border-slate-200 flex flex-wrap items-center justify-between gap-3 no-print">
             <div className="flex flex-wrap items-center gap-2">
-              <label className="text-xs font-semibold text-slate-600">Statement Trader Filter:</label>
+              <label className="text-xs font-semibold text-slate-600">{tr("Statement Trader Filter:", "வியாபாரி தேர்வு:")}</label>
               <select
                 value={stmtTraderId}
                 onChange={(e) => setStmtTraderId(e.target.value)}
                 className="px-3 py-1.5 rounded border border-slate-300 text-xs bg-white"
               >
-                <option value="">All Traders (Full Shed 30-Day Statement)</option>
+                <option value="">{tr("All Traders (Full Shed 30-Day Statement)", "அனைத்து வியாபாரிகள் (30 நாள் அறிக்கை)")}</option>
                 {traders.map((t) => (
                   <option key={t.id} value={t.id}>
                     {t.company_name}
@@ -1139,14 +1180,14 @@ export function AnalyticsReportsPage() {
                 onClick={() => void downloadProtectedFile("/exports/xlsx/workbook", "loomos_full_report.xlsx")}
                 className="px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
               >
-                <FileSpreadsheet className="w-4 h-4" /> Download 7-Sheet Excel (.xlsx)
+                <FileSpreadsheet className="w-4 h-4" /> {tr("Download 7-Sheet Excel (.xlsx)", "7-தாள் எக்செல் பதிவிறக்கு (.xlsx)")}
               </button>
               <button
                 type="button"
                 onClick={() => window.print()}
                 className="px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold inline-flex items-center gap-1.5 cursor-pointer"
               >
-                <Printer className="w-4 h-4" /> Print / Save PDF Statement
+                <Printer className="w-4 h-4" /> {tr("Print / Save PDF Statement", "அச்சு / PDF அறிக்கை")}
               </button>
             </div>
           </div>
@@ -1155,23 +1196,25 @@ export function AnalyticsReportsPage() {
             <div className="printable-area bg-white p-5 rounded-xl border border-slate-200 space-y-4 text-xs">
               <div className="border-b border-slate-200 pb-3 flex justify-between items-start">
                 <div>
-                  <div className="text-base font-bold text-slate-900">{statement.unit_name} — Monthly Operations &amp; Account Statement</div>
+                  <div className="text-base font-bold text-slate-900">
+                    {statement.unit_name} — {tr("Monthly Operations & Account Statement", "மாதாந்திர செயல்பாடு & கணக்கு அறிக்கை")}
+                  </div>
                   <div className="text-slate-500">
-                    Period: {formatDateDMY(statement.period_start)} to {formatDateDMY(statement.period_end)} · Cloth Woven:{" "}
+                    {tr("Period", "காலம்")}: {formatDateDMY(statement.period_start)} – {formatDateDMY(statement.period_end)} · {tr("Cloth Woven", "நெய்த துணி")}:{" "}
                     <b>{statement.period_metres} m</b>
                   </div>
                 </div>
                 <div className="text-right font-bold text-emerald-700">
-                  Net Operating: {formatRupeesFromPaise(statement.financials.net_operating_paise)}
+                  {tr("Net Operating", "நிகர லாபம்")}: {formatRupeesFromPaise(statement.financials.net_operating_paise)}
                 </div>
               </div>
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 <div className="bg-slate-50 p-2.5 rounded">
-                  Billed Revenue: <b>{formatRupeesFromPaise(statement.financials.billed_revenue_paise)}</b>
+                  {tr("Billed Revenue", "பில் வருமானம்")}: <b>{formatRupeesFromPaise(statement.financials.billed_revenue_paise)}</b>
                 </div>
                 <div className="bg-slate-50 p-2.5 rounded">
-                  Wages + EB + Exp:{" "}
+                  {tr("Wages + EB + Exp", "கூலி + EB + செலவு")}:{" "}
                   <b>
                     {formatRupeesFromPaise(
                       statement.financials.finalized_wages_paise +
@@ -1181,23 +1224,23 @@ export function AnalyticsReportsPage() {
                   </b>
                 </div>
                 <div className="bg-slate-50 p-2.5 rounded">
-                  All-Time Receivables: <b>{formatRupeesFromPaise(statement.financials.total_receivable_paise)}</b>
+                  {tr("All-Time Receivables", "மொத்த பாக்கி")}: <b>{formatRupeesFromPaise(statement.financials.total_receivable_paise)}</b>
                 </div>
                 <div className="bg-slate-50 p-2.5 rounded">
-                  Rate-Cut Shortfall: <b className="text-rose-700">{formatRupeesFromPaise(statement.financials.total_rate_underpayment_paise)}</b>
+                  {tr("Rate-Cut Shortfall", "விலை குறைப்பு")}: <b className="text-rose-700">{formatRupeesFromPaise(statement.financials.total_rate_underpayment_paise)}</b>
                 </div>
               </div>
 
               <div>
-                <h3 className="font-bold mb-1.5">Delivery Challans ({statement.deliveries.length})</h3>
+                <h3 className="font-bold mb-1.5">{tr(`Delivery Challans (${statement.deliveries.length})`, `டெலிவரி சலான்கள் (${statement.deliveries.length})`)}</h3>
                 <table className="w-full text-left">
                   <thead className="border-b border-slate-200 text-slate-500">
                     <tr>
-                      <th className="py-1 pr-2">Challan</th>
-                      <th className="py-1 pr-2">Date</th>
-                      <th className="py-1 pr-2">Trader</th>
-                      <th className="py-1 pr-2">Metres</th>
-                      <th className="py-1">Billed</th>
+                      <th className="py-1 pr-2">{tr("Challan", "சலான்")}</th>
+                      <th className="py-1 pr-2">{tr("Date", "தேதி")}</th>
+                      <th className="py-1 pr-2">{tr("Trader", "வியாபாரி")}</th>
+                      <th className="py-1 pr-2">{tr("Metres", "மீட்டர்")}</th>
+                      <th className="py-1">{tr("Billed", "தொகை")}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -1225,7 +1268,7 @@ export function AnalyticsReportsPage() {
             <div className="flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-sm font-bold flex items-center gap-1.5">
                 <Calculator className="w-4 h-4 text-amber-600" />
-                Shuttle Powerloom Expansion Simulator (P&amp;L, EMI, Payback &amp; Sensitivity)
+                {tr("Shuttle Powerloom Expansion Simulator (P&L, EMI, Payback & Sensitivity)", "விசைத்தறி விரிவாக்கக் கணக்கீடு (லாபம், EMI & முதலீடு மீட்பு)")}
               </h2>
               <div className="flex gap-1.5 text-xs font-bold">
                 {[20, 30, 50, 100].map((n) => (
@@ -1237,7 +1280,7 @@ export function AnalyticsReportsPage() {
                       simLooms === n ? "bg-amber-500 text-slate-950 border-amber-500" : "bg-white border-slate-300"
                     }`}
                   >
-                    {n} Looms
+                    {n} {tr("Looms", "தறிகள்")}
                   </button>
                 ))}
               </div>
@@ -1245,72 +1288,72 @@ export function AnalyticsReportsPage() {
 
             <div className="grid grid-cols-2 sm:grid-cols-7 gap-2.5 text-xs">
               <div>
-                <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Loom Count</label>
+                <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Loom Count", "தறி எண்ணிக்கை")}</label>
                 <input type="number" min={1} max={500} value={simLooms} onChange={(e) => setSimLooms(Number(e.target.value))} className="w-full px-2.5 py-1.5 rounded border border-slate-300" />
               </div>
               <div>
-                <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Shuttle RPM</label>
+                <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Shuttle RPM", "வேகம் (RPM)")}</label>
                 <input type="number" min={60} max={2000} value={simRpm} onChange={(e) => setSimRpm(Number(e.target.value))} className="w-full px-2.5 py-1.5 rounded border border-slate-300" />
               </div>
               <div>
-                <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Efficiency (%)</label>
+                <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Efficiency (%)", "திறன் (%)")}</label>
                 <input type="number" min={40} max={98} value={simEff} onChange={(e) => setSimEff(Number(e.target.value))} className="w-full px-2.5 py-1.5 rounded border border-slate-300" />
               </div>
               <div>
-                <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Job Rate (₹/m)</label>
+                <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Job Rate (₹/m)", "கூலி (₹/மீ)")}</label>
                 <input type="number" step="0.1" min="1" value={simRate} onChange={(e) => setSimRate(e.target.value)} className="w-full px-2.5 py-1.5 rounded border border-slate-300" />
               </div>
               <div>
-                <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Machine Cost / Loom (₹)</label>
+                <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Machine Cost / Loom (₹)", "1 தறி விலை (₹)")}</label>
                 <input type="number" step="1000" min="1000" value={simCapex} onChange={(e) => setSimCapex(e.target.value)} className="w-full px-2.5 py-1.5 rounded border border-slate-300" />
               </div>
               <div>
-                <label className="text-[11px] font-medium text-slate-600 block mb-0.5">Bank Loan (%)</label>
+                <label className="text-[11px] font-medium text-slate-600 block mb-0.5">{tr("Bank Loan (%)", "வங்கிக் கடன் (%)")}</label>
                 <input type="number" min={0} max={95} value={simLoanPct} onChange={(e) => setSimLoanPct(Number(e.target.value))} className="w-full px-2.5 py-1.5 rounded border border-slate-300" />
               </div>
               <div className="flex items-end">
                 <button type="button" onClick={() => void runCustomSimulation()} className="w-full py-1.5 px-3 rounded-lg bg-slate-900 text-white font-bold cursor-pointer">
-                  Recalculate
+                  {tr("Recalculate", "கணக்கிடு")}
                 </button>
               </div>
             </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs pt-2">
               <div className="bg-slate-50 p-3 rounded-lg">
-                <div className="text-slate-500">Monthly Income ({simResult.primary.loom_count} looms)</div>
+                <div className="text-slate-500">{tr(`Monthly Income (${simResult.primary.loom_count} looms)`, `மாத வருமானம் (${simResult.primary.loom_count} தறிகள்)`)}</div>
                 <div className="text-lg font-bold">{formatRupeesFromPaise(simResult.primary.gross_revenue_paise)}</div>
-                <div className="text-[11px] text-slate-500">{simResult.primary.monthly_metres} m / month</div>
+                <div className="text-[11px] text-slate-500">{simResult.primary.monthly_metres} m / {tr("month", "மாதம்")}</div>
               </div>
               <div className="bg-slate-50 p-3 rounded-lg">
-                <div className="text-slate-500">Monthly Profit (Before Loan)</div>
+                <div className="text-slate-500">{tr("Monthly Profit (Before Loan)", "மாத லாபம் (EMI முன்)")}</div>
                 <div className="text-lg font-bold text-emerald-700">{formatRupeesFromPaise(simResult.primary.ebitda_paise)}</div>
-                <div className="text-[11px] text-slate-500">EB Bill: {formatRupeesFromPaise(simResult.primary.eb_monthly_paise)}/mo</div>
+                <div className="text-[11px] text-slate-500">{tr("EB Bill", "EB பில்")}: {formatRupeesFromPaise(simResult.primary.eb_monthly_paise)}/{tr("mo", "மாதம்")}</div>
               </div>
               <div className="bg-slate-50 p-3 rounded-lg">
-                <div className="text-slate-500">Cash Left After Loan EMI</div>
+                <div className="text-slate-500">{tr("Cash Left After Loan EMI", "கடன் EMI போக மீதி")}</div>
                 <div className="text-lg font-bold">{formatRupeesFromPaise(simResult.primary.net_after_emi_paise)}</div>
-                <div className="text-[11px] text-slate-500">Loan EMI: {formatRupeesFromPaise(simResult.primary.emi_paise)}/mo</div>
+                <div className="text-[11px] text-slate-500">{tr("Loan EMI", "கடன் EMI")}: {formatRupeesFromPaise(simResult.primary.emi_paise)}/{tr("mo", "மாதம்")}</div>
               </div>
               <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg">
-                <div className="text-amber-900">Months to Recover Cost</div>
+                <div className="text-amber-900">{tr("Months to Recover Cost", "முதலீடு திரும்பும் காலம்")}</div>
                 <div className="text-lg font-bold text-amber-900">
-                  {simResult.primary.payback_months ? `${simResult.primary.payback_months} months` : "N/A"}
+                  {simResult.primary.payback_months ? `${simResult.primary.payback_months} ${tr("months", "மாதம்")}` : "N/A"}
                 </div>
-                <div className="text-[11px] text-amber-800">Total Investment: {formatRupeesFromPaise(simResult.primary.total_capex_paise)}</div>
+                <div className="text-[11px] text-amber-800">{tr("Total Investment", "மொத்த முதலீடு")}: {formatRupeesFromPaise(simResult.primary.total_capex_paise)}</div>
               </div>
             </div>
           </div>
 
           <div className="bg-white p-4 rounded-xl border border-slate-200 overflow-x-auto space-y-2">
-            <h3 className="text-sm font-bold">20 / 30 / 50 / 100 Loom Preset Comparison</h3>
+            <h3 className="text-sm font-bold">{tr("20 / 30 / 50 / 100 Loom Preset Comparison", "20 / 30 / 50 / 100 தறி ஒப்பீடு")}</h3>
             <table className="w-full text-xs text-left">
               <thead className="border-b border-slate-200 text-slate-500">
                 <tr>
-                  <th className="py-1.5 pr-2">Looms</th>
-                  <th className="py-1.5 pr-2">Metres/Mo</th>
-                  <th className="py-1.5 pr-2">EB Bill/Mo</th>
-                  <th className="py-1.5 pr-2">Monthly Profit</th>
-                  <th className="py-1.5">Payback Time</th>
+                  <th className="py-1.5 pr-2">{tr("Looms", "தறிகள்")}</th>
+                  <th className="py-1.5 pr-2">{tr("Metres/Mo", "மீட்டர்/மாதம்")}</th>
+                  <th className="py-1.5 pr-2">{tr("EB Bill/Mo", "EB/மாதம்")}</th>
+                  <th className="py-1.5 pr-2">{tr("Monthly Profit", "மாத லாபம்")}</th>
+                  <th className="py-1.5">{tr("Payback Time", "முதலீடு மீட்பு")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -1320,7 +1363,7 @@ export function AnalyticsReportsPage() {
                     <td className="py-1.5 pr-2">{p.monthly_metres} m</td>
                     <td className="py-1.5 pr-2">{formatRupeesFromPaise(p.eb_monthly_paise)}</td>
                     <td className="py-1.5 pr-2 text-emerald-700 font-semibold">{formatRupeesFromPaise(p.ebitda_paise)}</td>
-                    <td className="py-1.5">{p.payback_months ? `${p.payback_months} mo` : "-"}</td>
+                    <td className="py-1.5">{p.payback_months ? `${p.payback_months} ${tr("mo", "மா")}` : "-"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1328,14 +1371,20 @@ export function AnalyticsReportsPage() {
           </div>
 
           <TechnicalDetailsToggle
-            title="Show 5×5 Rate × Efficiency Profit Sensitivity Matrix (Thesis Details)"
-            subtitle="See how monthly profit changes if trader job rate or loom speed goes up or down"
+            title={tr(
+              "Show 5×5 Rate × Efficiency Profit Sensitivity Matrix (Thesis Details)",
+              "5×5 கூலி × திறன் லாப அட்டவணை (ஆராய்ச்சி விவரம்)"
+            )}
+            subtitle={tr(
+              "See how monthly profit changes if trader job rate or loom speed goes up or down",
+              "வியாபாரி கூலி அல்லது தறி வேகம் மாறினால் மாத லாபம் எவ்வாறு மாறும்"
+            )}
           >
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left">
                 <thead className="border-b border-slate-200 text-slate-500">
                   <tr>
-                    <th className="py-1.5 pr-2">Rate \ Efficiency</th>
+                    <th className="py-1.5 pr-2">{tr("Rate \\ Efficiency", "கூலி \\ திறன்")}</th>
                     {simResult.sensitivity_efficiencies.map((eff) => (
                       <th key={eff} className="py-1.5 pr-2">
                         {eff}%

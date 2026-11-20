@@ -10,6 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit, snapshot_fields, soft_delete_record
+from app.core.config import today_ist
 from app.core.database import get_db
 from app.core.i18n import get_payslip_translations
 from app.core.security import require_owner
@@ -149,9 +150,32 @@ def finalize_payslips(
 
     weavers = {w.id: w for w in db.scalars(select(Weaver)).all()}
     created: list[Payslip] = []
+    seen_req_weavers: set[int] = set()
     for item in payload.items:
         if item.weaver_id not in weavers:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Weaver {item.weaver_id} not found")
+        if item.weaver_id in seen_req_weavers:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Duplicate payslip row for {weavers[item.weaver_id].full_name} in request",
+            )
+        seen_req_weavers.add(item.weaver_id)
+        existing_slip = db.scalar(
+            select(Payslip.id).where(
+                Payslip.weaver_id == item.weaver_id,
+                Payslip.period_start == payload.period_start,
+                Payslip.period_end == payload.period_end,
+                Payslip.is_deleted.is_(False),
+            )
+        )
+        if existing_slip:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=(
+                    f"Payslip already finalized for {weavers[item.weaver_id].full_name} "
+                    f"({payload.period_start} to {payload.period_end}). Void it first to regenerate."
+                ),
+            )
         net_p = max(0, item.gross_paise - item.advance_deducted_paise - item.defect_deduction_paise)
         slip = Payslip(
             weaver_id=item.weaver_id,
@@ -254,5 +278,5 @@ def get_printable_payslip(
         localized_weaver_name=loc_name,
         role_type=(weaver.role_type if weaver else "WEAVER"),  # type: ignore[arg-type]
         labels=get_payslip_translations(resolved_lang),
-        printed_on=date.today(),
+        printed_on=today_ist(),
     )
