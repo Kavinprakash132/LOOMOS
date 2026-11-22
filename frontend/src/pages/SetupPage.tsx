@@ -47,6 +47,8 @@ export function SetupPage() {
       make_model: "",
       rated_rpm: 160,
       reed_space_in: 56,
+      cloth_width_in: 52,
+      default_pick: 60,
     },
   ]);
 
@@ -240,7 +242,7 @@ export function SetupPage() {
                     minLength={2}
                     value={ownerFullName}
                     onChange={(e) => setOwnerFullName(e.target.value)}
-                    placeholder="e.g. Ramasamy K"
+                    placeholder="e.g. Kavin"
                     className={`w-full px-3 py-2 rounded-lg border text-sm ${
                       ownerNameInvalid ? "field-invalid" : "border-slate-300"
                     }`}
@@ -357,7 +359,7 @@ export function SetupPage() {
                         </button>
                       )}
                     </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                       <div>
                         <label className="block text-[11px] font-semibold text-slate-600 mb-1">
                           {t("loomCount")}
@@ -397,14 +399,6 @@ export function SetupPage() {
                       </div>
                       <div>
                         <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                          {t("loomType")}
-                        </label>
-                        <div className="w-full px-2.5 py-1.5 rounded border border-slate-200 bg-slate-100 text-xs font-semibold text-slate-700">
-                          Shuttle Powerloom
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
                           {t("rpm")}
                         </label>
                         <input
@@ -421,6 +415,65 @@ export function SetupPage() {
                           className={`w-full px-2.5 py-1.5 rounded border bg-white text-sm ${
                             attemptedStep2 && g.rated_rpm < 40 ? "field-invalid" : "border-slate-300"
                           }`}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                          Reed Space (in)
+                        </label>
+                        <input
+                          type="number"
+                          step="1"
+                          min={20}
+                          max={220}
+                          value={g.reed_space_in || ""}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value, 10) || 0;
+                            setLoomGroups((prev) =>
+                              prev.map((row, i) => (i === idx ? { ...row, reed_space_in: val } : row))
+                            );
+                          }}
+                          placeholder="56"
+                          className="w-full px-2.5 py-1.5 rounded border border-slate-300 bg-white text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                          Cloth Width (in)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.5"
+                          min={10}
+                          max={200}
+                          value={g.cloth_width_in ?? ""}
+                          onChange={(e) => {
+                            const val = e.target.value ? Number(e.target.value) : null;
+                            setLoomGroups((prev) =>
+                              prev.map((row, i) => (i === idx ? { ...row, cloth_width_in: val } : row))
+                            );
+                          }}
+                          placeholder="52"
+                          className="w-full px-2.5 py-1.5 rounded border border-slate-300 bg-white text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                          Pick (PPI)
+                        </label>
+                        <input
+                          type="number"
+                          min={10}
+                          max={400}
+                          value={g.default_pick ?? ""}
+                          onChange={(e) => {
+                            const val = e.target.value ? parseInt(e.target.value, 10) : null;
+                            setLoomGroups((prev) =>
+                              prev.map((row, i) => (i === idx ? { ...row, default_pick: val } : row))
+                            );
+                          }}
+                          placeholder="60"
+                          className="w-full px-2.5 py-1.5 rounded border border-slate-300 bg-white text-sm"
                         />
                       </div>
                     </div>
@@ -441,6 +494,8 @@ export function SetupPage() {
                       make_model: "",
                       rated_rpm: 165,
                       reed_space_in: 56,
+                      cloth_width_in: 52,
+                      default_pick: 60,
                     },
                   ])
                 }

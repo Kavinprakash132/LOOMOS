@@ -1,6 +1,8 @@
 import React, { useState } from "react";
+import { Plus, X } from "lucide-react";
 import { apiRequest, formatRupeesFromPaise } from "../../api/client";
 import { useAuth } from "../../context/AuthContext";
+import { useToast } from "../../context/ToastContext";
 import { FabricSort, Trader } from "../../types/api";
 
 export function TradersSortsTab({
@@ -15,6 +17,9 @@ export function TradersSortsTab({
   onError: (msg: string) => void;
 }) {
   const { tr } = useAuth();
+  const toast = useToast();
+  const [showAddTrader, setShowAddTrader] = useState(false);
+  const [showAddSort, setShowAddSort] = useState(false);
   const [companyName, setCompanyName] = useState("");
   const [contactName, setContactName] = useState("");
   const [phone, setPhone] = useState("");
@@ -37,9 +42,12 @@ export function TradersSortsTab({
         method: "POST",
         body: JSON.stringify({ company_name: companyName, contact_name: contactName, phone }),
       });
+      const addedCompany = companyName.trim();
       setCompanyName("");
       setContactName("");
       setPhone("");
+      setShowAddTrader(false);
+      toast.success(tr(`Trader ${addedCompany} added.`, `வியாபாரி ${addedCompany} சேர்க்கப்பட்டார்.`));
       await onRefresh();
     } catch (err) {
       onError(err instanceof Error ? err.message : "Failed to add trader");
@@ -66,7 +74,10 @@ export function TradersSortsTab({
           wastage_pct: wastagePct,
         }),
       });
+      const addedSort = sortName.trim();
       setSortName("");
+      setShowAddSort(false);
+      toast.success(tr(`Fabric sort ${addedSort} added.`, `துணி வகை ${addedSort} சேர்க்கப்பட்டது.`));
       await onRefresh();
     } catch (err) {
       onError(err instanceof Error ? err.message : "Failed to add sort");
@@ -85,6 +96,7 @@ export function TradersSortsTab({
         body: JSON.stringify({ agreed_rate_paise: nextPaise }),
       });
       setEditingSortId(null);
+      toast.success(tr("Agreed sort rate updated.", "துணி ஒப்பந்த விலை புதுப்பிக்கப்பட்டது."));
       await onRefresh();
     } catch (err) {
       onError(err instanceof Error ? err.message : "Rate update failed");
@@ -95,8 +107,24 @@ export function TradersSortsTab({
     <div className="space-y-6">
       {/* Traders */}
       <div className="space-y-3">
-        <form onSubmit={addTrader} className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
-          <h3 className="text-sm font-bold">{tr("Job-Work Traders (Parties Who Give Beams & Pay Per Metre)", "வியாபாரிகள் (பீம் கொடுத்து மீட்டர் கூலி தருபவர்கள்)")}</h3>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-bold text-slate-900">
+            {tr(`Job-Work Traders (${traders.length})`, `வியாபாரிகள் (${traders.length})`)}
+          </h3>
+          <button
+            type="button"
+            onClick={() => setShowAddTrader((v) => !v)}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+              showAddTrader ? "bg-slate-200 text-slate-800" : "bg-slate-900 text-white hover:bg-slate-800"
+            }`}
+          >
+            {showAddTrader ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+            {showAddTrader ? tr("Close", "மூடு") : tr("Add Trader", "வியாபாரி சேர்")}
+          </button>
+        </div>
+
+        {showAddTrader && (
+        <form onSubmit={addTrader} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
           <div className="grid sm:grid-cols-3 gap-2">
             <div>
               <label className="block text-[11px] font-semibold text-slate-600 mb-1">
@@ -129,10 +157,11 @@ export function TradersSortsTab({
               />
             </div>
           </div>
-          <button type="submit" className="px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold">
-            {tr("Add Trader", "வியாபாரி சேர்")}
+          <button type="submit" className="px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold cursor-pointer">
+            {tr("Save Trader", "வியாபாரி சேமி")}
           </button>
         </form>
+        )}
         <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
           {traders.map((item) => (
             <div key={item.id} className="px-4 py-2.5 flex justify-between text-sm">
@@ -148,8 +177,24 @@ export function TradersSortsTab({
 
       {/* Fabric Sorts */}
       <div className="space-y-3">
-        <form onSubmit={addSort} className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
-          <h3 className="text-sm font-bold">{tr("Fabric Sorts (Used for Rate Checker, Speed Target & Weft Wastage)", "துணி வகைகள் (விலை சரிபார்ப்பு & நூல் வீண் கணக்கு)")}</h3>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-bold text-slate-900">
+            {tr(`Fabric Sorts (${sorts.length})`, `துணி வகைகள் (${sorts.length})`)}
+          </h3>
+          <button
+            type="button"
+            onClick={() => setShowAddSort((v) => !v)}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+              showAddSort ? "bg-slate-200 text-slate-800" : "bg-slate-900 text-white hover:bg-slate-800"
+            }`}
+          >
+            {showAddSort ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+            {showAddSort ? tr("Close", "மூடு") : tr("Add Fabric Sort", "துணி வகை சேர்")}
+          </button>
+        </div>
+
+        {showAddSort && (
+        <form onSubmit={addSort} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
           <div className="grid sm:grid-cols-4 gap-2">
             <div className="sm:col-span-2">
               <label className="block text-[11px] font-semibold text-slate-600 mb-1">
@@ -237,10 +282,11 @@ export function TradersSortsTab({
               />
             </div>
           </div>
-          <button type="submit" className="px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold">
-            {tr("Add Fabric Sort", "துணி வகை சேர்")}
+          <button type="submit" className="px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold cursor-pointer">
+            {tr("Save Fabric Sort", "துணி வகை சேமி")}
           </button>
         </form>
+        )}
 
         <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto">
           <table className="min-w-full text-xs">

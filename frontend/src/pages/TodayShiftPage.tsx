@@ -1,9 +1,22 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { AlertCircle, Calendar, ClipboardCheck, Plus, Save, Trash2, Users, X } from "lucide-react";
+import {
+  AlertCircle,
+  Calendar,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  ClipboardCheck,
+  Plus,
+  Save,
+  Trash2,
+  Users,
+  X,
+} from "lucide-react";
 import { apiRequest, formatDateDMY, generateUuid, localIsoDate, offsetLocalIsoDate } from "../api/client";
 import { ConfirmVoidModal } from "../components/ConfirmVoidModal";
-import { PageGuideBanner } from "../components/PageGuideBanner";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
+import { useLiveRefresh } from "../hooks/useLiveRefresh";
 import {
   AlertItem,
   AttendanceRecord,
@@ -42,22 +55,25 @@ interface EditableShiftRow {
 
 export function TodayShiftPage() {
   const { user, tr } = useAuth();
+  const toast = useToast();
   const isOwner = user?.role === "OWNER";
+
+  const [activeTab, setActiveTab] = useState<"production" | "attendance">("production");
   const [entryDate, setEntryDate] = useState(localIsoDate());
   const [shiftNo, setShiftNo] = useState<number>(1);
+  const [entryMode, setEntryMode] = useState<EntryMode>("DIRECT");
   const [prefill, setPrefill] = useState<ShiftPrefillResponse | null>(null);
   const [rows, setRows] = useState<EditableShiftRow[]>([]);
+  const [expandedLoomIds, setExpandedLoomIds] = useState<Record<number, boolean>>({});
   const [weavers, setWeavers] = useState<Weaver[]>([]);
   const [beams, setBeams] = useState<Beam[]>([]);
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const [saving, setSaving] = useState(false);
   const [attemptedSave, setAttemptedSave] = useState(false);
+  const [lastSavedText, setLastSavedText] = useState<string | null>(null);
   const [voidTarget, setVoidTarget] = useState<{ shiftId: number; loomNumber: string } | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
 
-  // Worker attendance & Holiday panel state
-  const [showAttendance, setShowAttendance] = useState(false);
+  // Worker attendance & Holiday tab state
   const [attMap, setAttMap] = useState<Record<number, AttendanceStatus>>({});
   const [isWorkingDay, setIsWorkingDay] = useState(true);
   const [calNote, setCalNote] = useState("");
@@ -65,7 +81,6 @@ export function TodayShiftPage() {
 
   const loadMastersAndPrefill = useCallback(
     async (targetDate: string, targetShift: number | null) => {
-      setError(null);
       try {
         const qs = targetShift
           ? `/shifts/prefill?entry_date=${targetDate}&shift_no=${targetShift}`
@@ -80,7 +95,10 @@ export function TodayShiftPage() {
         ]);
 
         setPrefill(pf);
-        if (!targetShift) setShiftNo(pf.shift_no);
+        if (!targetShift) {
+          setShiftNo(pf.shift_no);
+          setEntryMode(pf.default_entry_mode);
+        }
         setWeavers(wv);
         setBeams(bm);
         setAlerts(al);
@@ -90,7 +108,7 @@ export function TodayShiftPage() {
 
         for (const lr of pf.looms) {
           if (lr.existing_entries.length > 0) {
-            for (const ex of lr.existing_entries) {
+            lr.existing_entries.forEach((ex, idx) => {
               builtRows.push({
                 rowKey: `${lr.loom_id}-${ex.id}`,
                 existingId: ex.id,
@@ -113,8 +131,9 @@ export function TodayShiftPage() {
                 defectiveMetres: ex.defective_metres,
                 stopReasonId: ex.stop_reason_id,
                 notes: ex.notes ?? "",
+                isSwapExtra: idx > 0,
               });
-            }
+            });
           } else {
             builtRows.push({
               rowKey: `${lr.loom_id}-new`,
@@ -157,10 +176,10 @@ export function TodayShiftPage() {
           setCalNote("");
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load shift grid");
+        toast.error(err instanceof Error ? err.message : tr("Failed to load shift grid", "ஷிப்ட் தகவலை ஏற்ற முடியவில்லை"));
       }
     },
-    []
+    [toast, tr]
   );
 
   useEffect(() => {
@@ -170,12 +189,22 @@ export function TodayShiftPage() {
     }
   }, [initializedShiftAuto, entryDate, loadMastersAndPrefill]);
 
+  const refreshLive = useCallback(() => {
+    void loadMastersAndPrefill(entryDate, shiftNo);
+  }, [entryDate, shiftNo, loadMastersAndPrefill]);
+  useLiveRefresh(refreshLive);
+
   const handleDateOrShiftChange = (nextDate: string, nextShift: number) => {
     setEntryDate(nextDate);
     setShiftNo(nextShift);
     setAttemptedSave(false);
-    setSuccess(null);
+    setLastSavedText(null);
     void loadMastersAndPrefill(nextDate, nextShift);
+  };
+
+  const applyGlobalMode = (nextMode: EntryMode) => {
+    setEntryMode(nextMode);
+    setRows((prev) => prev.map((r) => ({ ...r, entryMode: nextMode })));
   };
 
   const updateRow = (rowKey: string, patch: Partial<EditableShiftRow>) => {
@@ -196,7 +225,7 @@ export function TodayShiftPage() {
     );
   };
 
-  const addBeamSwapRow = (src: EditableShiftRow) => {
+  const addMidShiftSecondBeam = (src: EditableShiftRow) => {
     if (rows.some((x) => x.loomId === src.loomId && x.isSwapExtra)) return;
     const newRow: EditableShiftRow = {
       ...src,
@@ -212,12 +241,8 @@ export function TodayShiftPage() {
       defectiveMetres: "0",
       isSwapExtra: true,
     };
-    setRows((prev) => {
-      const idx = prev.findIndex((x) => x.rowKey === src.rowKey);
-      const copy = [...prev];
-      copy.splice(idx + 1, 0, newRow);
-      return copy;
-    });
+    setRows((prev) => [...prev, newRow]);
+    setExpandedLoomIds((prev) => ({ ...prev, [src.loomId]: true }));
   };
 
   const removeSwapRow = (rowKey: string) => {
@@ -257,34 +282,26 @@ export function TodayShiftPage() {
   const isRowDefectBad = (r: EditableShiftRow) =>
     r.defectiveMetres !== "" && parseFloat(r.defectiveMetres) < 0;
 
-  const hasValidMetresRow = rows.some((r) => {
+  const validRows = rows.filter((r) => {
     if (isRowStopped(r)) return true;
-    if (r.entryMode === "COUNTER") {
-      return r.startMeter !== "" && r.endMeter !== "" && parseFloat(r.endMeter) >= parseFloat(r.startMeter);
-    }
-    return r.netMetres !== "" && parseFloat(r.netMetres) >= 0;
+    if (r.entryMode === "COUNTER") return r.startMeter !== "" && r.endMeter !== "";
+    return r.netMetres !== "";
   });
 
   const handleSaveGrid = async (e: React.FormEvent) => {
     e.preventDefault();
     setAttemptedSave(true);
-    setError(null);
-    setSuccess(null);
+
     if (rows.some((r) => isRowCounterBad(r) || isRowDirectBad(r) || isRowDefectBad(r))) {
-      setError(tr("Fix the highlighted invalid shift fields before saving.", "சேமிக்கும் முன் சிவப்பு நிற தவறான கட்டங்களை சரிசெய்யவும்."));
+      toast.error(tr("Fix the highlighted invalid metre fields before saving.", "சிவப்பு நிற தவறான கட்டங்களை சரிசெய்து சேமிக்கவும்."));
       return;
     }
-    const validRows = rows.filter((r) => {
-      if (isRowStopped(r)) return true;
-      if (r.entryMode === "COUNTER") return r.startMeter !== "" && r.endMeter !== "";
-      return r.netMetres !== "";
-    });
     if (validRows.length === 0) {
-      setError(tr("Enter metres (or mark a loom Stopped) before saving.", "சேமிக்கும் முன் மீட்டரை உள்ளிடவும் (அல்லது தறி நிறுத்தப்பட்டது என குறிக்கவும்)."));
+      toast.error(tr("Enter metres for at least one loom (or mark Stopped) before saving.", "குறைந்தது ஒரு தறியின் மீட்டரை உள்ளிட்டு சேமிக்கவும்."));
       return;
     }
     if (weavers.length === 0) {
-      setError(tr("Add at least one Weaver in Settings before logging shifts.", "ஷிப்ட் பதிவதற்கு முன் அமைப்புகளில் குறைந்தது ஒரு நெசவாளரைச் சேர்க்கவும்."));
+      toast.error(tr("Add at least one Weaver in Shed Setup before logging shifts.", "அமைப்புகளில் ஒரு நெசவாளரைச் சேர்த்துவிட்டு ஷிப்ட் பதியவும்."));
       return;
     }
 
@@ -315,15 +332,15 @@ export function TodayShiftPage() {
         body: JSON.stringify(payload),
       });
       setAttemptedSave(false);
-      setSuccess(
-        tr(
-          `Saved ${saved.length} loom entries for ${formatDateDMY(entryDate)} (Shift ${shiftNo}).`,
-          `${formatDateDMY(entryDate)} (ஷிப்ட் ${shiftNo}) — ${saved.length} தறி பதிவுகள் சேமிக்கப்பட்டன.`
-        )
+      const msg = tr(
+        `Saved ${saved.length} loom entr${saved.length === 1 ? "y" : "ies"} for ${formatDateDMY(entryDate)} (Shift ${shiftNo}).`,
+        `${formatDateDMY(entryDate)} (ஷிப்ட் ${shiftNo}) — ${saved.length} தறி பதிவுகள் சேமிக்கப்பட்டன.`
       );
+      setLastSavedText(msg);
+      toast.success(msg);
       await loadMastersAndPrefill(entryDate, shiftNo);
     } catch (err) {
-      setError(err instanceof Error ? err.message : tr("Failed to save shift entries", "ஷிப்ட் பதிவுகளை சேமிக்க முடியவில்லை"));
+      toast.error(err instanceof Error ? err.message : tr("Failed to save shift entries", "ஷிப்ட் பதிவுகளை சேமிக்க முடியவில்லை"));
     } finally {
       setSaving(false);
     }
@@ -334,21 +351,22 @@ export function TodayShiftPage() {
       weaver_id: Number(wid),
       status: st,
     }));
-    if (items.length === 0) return;
-    setError(null);
+    if (items.length === 0) {
+      toast.info(tr("Select at least one worker status first.", "குறைந்தது ஒரு தொழிலாளர் நிலையைத் தேர்ந்தெடுக்கவும்."));
+      return;
+    }
     try {
       await apiRequest("/attendance/batch", {
         method: "POST",
         body: JSON.stringify({ attendance_date: entryDate, shift_no: shiftNo, items }),
       });
-      setSuccess(tr(`Attendance saved for Shift ${shiftNo} (${items.length} workers).`, `ஷிப்ட் ${shiftNo} வருகைப்பதிவு சேமிக்கப்பட்டது (${items.length} தொழிலாளர்கள்).`));
+      toast.success(tr(`Attendance saved for Shift ${shiftNo} (${items.length} workers).`, `ஷிப்ட் ${shiftNo} வருகைப்பதிவு சேமிக்கப்பட்டது.`));
     } catch (err) {
-      setError(err instanceof Error ? err.message : tr("Failed to save attendance", "வருகைப்பதிவை சேமிக்க முடியவில்லை"));
+      toast.error(err instanceof Error ? err.message : tr("Failed to save attendance", "வருகைப்பதிவை சேமிக்க முடியவில்லை"));
     }
   };
 
   const handleSaveCalendar = async () => {
-    setError(null);
     try {
       await apiRequest(`/calendar/${entryDate}`, {
         method: "PUT",
@@ -358,9 +376,9 @@ export function TodayShiftPage() {
           note: calNote || null,
         }),
       });
-      setSuccess(tr(`Shed calendar updated for ${formatDateDMY(entryDate)}.`, `${formatDateDMY(entryDate)} ஆலை நாள்காட்டி புதுப்பிக்கப்பட்டது.`));
+      toast.success(tr(`Calendar updated for ${formatDateDMY(entryDate)}.`, `${formatDateDMY(entryDate)} நாள்காட்டி புதுப்பிக்கப்பட்டது.`));
     } catch (err) {
-      setError(err instanceof Error ? err.message : tr("Failed to update calendar", "நாள்காட்டியைப் புதுப்பிக்க முடியவில்லை"));
+      toast.error(err instanceof Error ? err.message : tr("Failed to update calendar", "நாள்காட்டியைப் புதுப்பிக்க முடியவில்லை"));
     }
   };
 
@@ -370,11 +388,11 @@ export function TodayShiftPage() {
       body: JSON.stringify({ status: "DISMISSED" }),
     });
     setAlerts((prev) => prev.filter((a) => a.id !== alertId));
+    toast.info(tr("Alert dismissed.", "எச்சரிக்கை நீக்கப்பட்டது."));
   };
 
   const confirmVoidShift = async (reason: string) => {
     if (!voidTarget) return;
-    setError(null);
     try {
       await apiRequest(`/shifts/${voidTarget.shiftId}`, {
         method: "DELETE",
@@ -382,64 +400,97 @@ export function TodayShiftPage() {
       });
       const clearedNum = voidTarget.loomNumber;
       setVoidTarget(null);
-      setSuccess(tr(`Removed saved shift entry for ${clearedNum} cleanly.`, `${clearedNum} தறியின் ஷிப்ட் பதிவு நீக்கப்பட்டது.`));
+      toast.success(tr(`Removed saved shift entry for ${clearedNum}.`, `${clearedNum} தறியின் ஷிப்ட் பதிவு நீக்கப்பட்டது.`));
       await loadMastersAndPrefill(entryDate, shiftNo);
     } catch (err) {
       setVoidTarget(null);
-      setError(err instanceof Error ? err.message : tr("Failed to remove shift", "ஷிப்ட் பதிவை நீக்க முடியவில்லை"));
+      toast.error(err instanceof Error ? err.message : tr("Failed to remove shift", "ஷிப்ட் பதிவை நீக்க முடியவில்லை"));
     }
   };
 
   const maxShifts = prefill?.shifts_per_day ?? 2;
   const totalMetresEntered = rows.reduce((acc, r) => acc + (parseFloat(r.netMetres || "0") || 0), 0);
 
+  // Group primary loom row + optional mid-shift 2nd beam row under the SAME visual card
+  const primaryRows = rows.filter((r) => !r.isSwapExtra);
+  const swapByLoomId = new Map<number, EditableShiftRow>();
+  for (const r of rows) {
+    if (r.isSwapExtra) swapByLoomId.set(r.loomId, r);
+  }
+
   return (
-    <div className="space-y-5 pb-12">
+    <div className="space-y-4 pb-12">
       <ConfirmVoidModal
         open={Boolean(voidTarget)}
         title={tr(`Remove Saved Shift on ${voidTarget?.loomNumber ?? ""}?`, `${voidTarget?.loomNumber ?? ""} தறியின் ஷிப்ட் பதிவை நீக்கவா?`)}
         description={tr(
-          "This removes the saved production entry for this shift while keeping an audit record.",
-          "இந்த ஷிப்ட் உற்பத்தி பதிவு நீக்கப்படும்; ஆனால் மாற்றப் பதிவில் வரலாறு இருக்கும்."
+          "Removes this saved production entry while keeping an audit record.",
+          "இந்த ஷிப்ட் உற்பத்தி பதிவு நீக்கப்படும்; மாற்றப் பதிவில் வரலாறு இருக்கும்."
         )}
         confirmLabel={tr("Remove Shift Entry", "பதிவை நீக்கு")}
         onCancel={() => setVoidTarget(null)}
         onConfirm={confirmVoidShift}
       />
 
+      {/* Clean Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-slate-900 flex items-center gap-2">
             <ClipboardCheck className="w-5 h-5 text-amber-600" />
-            {tr("Daily Shift Production Grid", "தினசரி ஷிப்ட் உற்பத்திப் பதிவு")}
+            {tr("Daily Production", "தினசரி உற்பத்தி")}
           </h1>
           <p className="text-xs text-slate-500">
-            {tr(
-              "Enter daily shuttle loom output, toggle Running / Stopped, and log mid-shift beam changes if needed.",
-              "தினசரி தறி உற்பத்தி மீட்டர்களை உள்ளிட்டு, இயக்கம் / நிறுத்தம் மற்றும் பீம் மாற்றங்களைப் பதிவு செய்யவும்."
-            )}
+            {formatDateDMY(entryDate)} · {tr(`Shift ${shiftNo}`, `ஷிப்ட் ${shiftNo}`)}
           </p>
         </div>
-        <div className="bg-slate-900 text-white px-3.5 py-2 rounded-xl text-xs font-semibold">
-          {tr("Grid Total", "மொத்தம்")}: <span className="text-amber-400 text-sm">{totalMetresEntered.toFixed(1)} m</span>
+
+        <div className="flex items-center gap-2">
+          <div className="bg-slate-900 text-white px-3.5 py-2 rounded-xl text-xs font-semibold">
+            {tr("Total", "மொத்தம்")}: <span className="text-amber-400 text-sm">{totalMetresEntered.toFixed(1)} m</span>
+          </div>
         </div>
       </div>
 
-      {/* Open Alerts Banner */}
+      {/* Clean 2-Tab Bar (Production vs Attendance & Holiday) */}
+      <div className="flex items-center gap-6 border-b border-slate-200 text-sm font-semibold">
+        <button
+          type="button"
+          onClick={() => setActiveTab("production")}
+          className={`pb-2.5 border-b-2 transition cursor-pointer ${
+            activeTab === "production"
+              ? "border-amber-500 text-slate-900"
+              : "border-transparent text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          {tr("Loom Production", "தறி உற்பத்தி")}
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("attendance")}
+          className={`pb-2.5 border-b-2 transition cursor-pointer inline-flex items-center gap-1.5 ${
+            activeTab === "attendance"
+              ? "border-amber-500 text-slate-900"
+              : "border-transparent text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          {tr("Attendance & Holiday", "வருகை & விடுமுறை")}
+        </button>
+      </div>
+
+      {/* Open Alerts (compact) */}
       {alerts.length > 0 && (
-        <div className="bg-amber-50 border border-amber-300 rounded-xl p-3 space-y-1.5">
+        <div className="bg-amber-50 border border-amber-200 rounded-xl px-3.5 py-2.5 space-y-1">
           <div className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
-            <AlertCircle className="w-4 h-4" /> {tr(`Open Shed Alerts (${alerts.length})`, `திறந்த எச்சரிக்கைகள் (${alerts.length})`)}
+            <AlertCircle className="w-3.5 h-3.5" /> {tr(`Open Alerts (${alerts.length})`, `எச்சரிக்கைகள் (${alerts.length})`)}
           </div>
-          {alerts.slice(0, 4).map((a) => (
+          {alerts.slice(0, 3).map((a) => (
             <div key={a.id} className="flex items-center justify-between gap-2 text-xs text-amber-900">
-              <span>
-                <b>[{a.alert_type}]</b> {a.message}
-              </span>
+              <span className="truncate">{a.message}</span>
               <button
                 type="button"
                 onClick={() => void dismissAlert(a.id)}
-                className="text-slate-600 underline shrink-0"
+                className="text-slate-600 hover:text-slate-900 underline shrink-0 cursor-pointer"
               >
                 {tr("Dismiss", "நீக்கு")}
               </button>
@@ -448,27 +499,16 @@ export function TodayShiftPage() {
         </div>
       )}
 
-      {error && <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 text-rose-800 text-sm">{error}</div>}
-      {success && <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm">{success}</div>}
-
-      <PageGuideBanner
-        steps={[
-          tr("Pick Date & Shift (Day / Night)", "தேதி & ஷிப்ட் (பகல் / இரவு) தேர்ந்தெடுக்கவும்"),
-          tr("Type Metres Woven (or switch to Counter for Start→End)", "நெய்த மீட்டரை உள்ளிடவும் (அல்லது மீட்டர் எண்)"),
-          tr("Mark any Stopped loom & click Save Shift", "நின்ற தறியைக் குறித்து ஷிப்டைச் சேமிக்கவும்"),
-        ]}
-      />
-
-      {/* Smart Date & Shift Bar */}
-      <div className="bg-white p-3.5 rounded-xl border border-slate-200 flex flex-wrap items-center justify-between gap-3">
+      {/* Single Clean Date, Shift & Entry Mode Bar */}
+      <div className="bg-white p-3 rounded-2xl border border-slate-200 flex flex-wrap items-center justify-between gap-2.5">
         <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => handleDateOrShiftChange(localIsoDate(), shiftNo)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer ${
               entryDate === localIsoDate()
                 ? "bg-amber-500 text-slate-950 border-amber-500"
-                : "bg-white text-slate-700 border-slate-300"
+                : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
             }`}
           >
             {tr("Today", "இன்று")}
@@ -476,10 +516,10 @@ export function TodayShiftPage() {
           <button
             type="button"
             onClick={() => handleDateOrShiftChange(offsetLocalIsoDate(-1), shiftNo)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-semibold border cursor-pointer ${
               entryDate === offsetLocalIsoDate(-1)
                 ? "bg-amber-500 text-slate-950 border-amber-500"
-                : "bg-white text-slate-700 border-slate-300"
+                : "bg-white text-slate-700 border-slate-300 hover:bg-slate-50"
             }`}
           >
             {tr("Yesterday", "நேற்று")}
@@ -488,20 +528,20 @@ export function TodayShiftPage() {
             type="date"
             value={entryDate}
             onChange={(e) => handleDateOrShiftChange(e.target.value, shiftNo)}
-            className="px-3 py-1.5 rounded-lg border border-slate-300 text-sm font-medium"
+            className="px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs font-medium"
           />
-          <div className="inline-flex rounded-lg border border-slate-300 bg-slate-100 p-0.5 text-xs font-semibold">
+          <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-xs font-semibold">
             {[
-              { no: 1, label: tr("Shift 1 (Day)", "ஷிப்ட் 1 (பகல்)") },
-              ...(maxShifts >= 2 ? [{ no: 2, label: tr("Shift 2 (Night)", "ஷிப்ட் 2 (இரவு)") }] : []),
+              { no: 1, label: tr("Shift 1", "ஷிப்ட் 1") },
+              ...(maxShifts >= 2 ? [{ no: 2, label: tr("Shift 2", "ஷிப்ட் 2") }] : []),
               ...(maxShifts >= 3 ? [{ no: 3, label: tr("Shift 3", "ஷிப்ட் 3") }] : []),
             ].map((s) => (
               <button
                 key={s.no}
                 type="button"
                 onClick={() => handleDateOrShiftChange(entryDate, s.no)}
-                className={`px-3 py-1.5 rounded-md cursor-pointer transition ${
-                  shiftNo === s.no ? "bg-slate-900 text-white shadow-xs" : "text-slate-700 hover:text-slate-900"
+                className={`px-3 py-1 rounded-md cursor-pointer transition ${
+                  shiftNo === s.no ? "bg-slate-900 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
                 }`}
               >
                 {s.label}
@@ -510,49 +550,43 @@ export function TodayShiftPage() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setShowAttendance((v) => !v)}
-            className="px-3 py-1.5 rounded-lg border border-slate-300 text-xs font-semibold inline-flex items-center gap-1.5 hover:bg-slate-50"
-          >
-            <Users className="w-3.5 h-3.5" /> {tr("Worker Attendance & Holiday", "வருகைப்பதிவு & விடுமுறை")}
-          </button>
-          <div className="inline-flex items-center rounded-lg border border-slate-300 bg-slate-50 p-0.5 text-xs">
-            <span className="px-2 text-[11px] font-semibold text-slate-500">{tr("All Looms:", "எல்லா தறிகள்:")}</span>
+        {activeTab === "production" && (
+          <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-xs font-semibold">
             <button
               type="button"
-              onClick={() => setRows((prev) => prev.map((r) => ({ ...r, entryMode: "DIRECT" })))}
-              className="px-2.5 py-1 rounded-md font-semibold bg-white hover:bg-slate-100 text-slate-800 shadow-xs cursor-pointer"
-              title={tr("Type total cloth metres directly", "மொத்த துணி மீட்டரை நேரடியாக உள்ளிடவும்")}
+              onClick={() => applyGlobalMode("DIRECT")}
+              className={`px-3 py-1 rounded-md cursor-pointer transition ${
+                entryMode === "DIRECT" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
+              }`}
             >
-              {tr("Total Metres", "மொத்த மீட்டர்")}
+              {tr("Direct Metres", "நேரடி மீட்டர்")}
             </button>
             <button
               type="button"
-              onClick={() => setRows((prev) => prev.map((r) => ({ ...r, entryMode: "COUNTER" })))}
-              className="px-2.5 py-1 rounded-md font-semibold text-slate-700 hover:bg-white cursor-pointer"
-              title={tr("Enter Start & End loom meter readings", "தொடக்க & முடிவு மீட்டர் எண்களை உள்ளிடவும்")}
+              onClick={() => applyGlobalMode("COUNTER")}
+              className={`px-3 py-1 rounded-md cursor-pointer transition ${
+                entryMode === "COUNTER" ? "bg-white text-slate-900 shadow-xs" : "text-slate-600 hover:text-slate-900"
+              }`}
             >
               {tr("Meter Counter", "மீட்டர் எண்")}
             </button>
           </div>
-        </div>
+        )}
       </div>
 
-      {/* Collapsible Attendance & Holiday Panel */}
-      {showAttendance && (
-        <div className="grid md:grid-cols-2 gap-4 bg-white p-4 rounded-xl border border-slate-200">
-          <div className="space-y-3">
-            <h2 className="text-sm font-bold flex items-center gap-1.5">
+      {/* Tab 2: Attendance & Holiday */}
+      {activeTab === "attendance" ? (
+        <div className="grid md:grid-cols-2 gap-4">
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 space-y-3">
+            <h2 className="text-sm font-bold flex items-center gap-1.5 text-slate-900">
               <Users className="w-4 h-4 text-amber-600" />
-              {tr(`Shift ${shiftNo} Attendance (Helpers, Fitters & Zero-Loom Weavers)`, `ஷிப்ட் ${shiftNo} வருகைப்பதிவு (உதவியாளர், ஃபிட்டர் & நெசவாளர்)`)}
+              {tr(`Shift ${shiftNo} Worker Attendance`, `ஷிப்ட் ${shiftNo} தொழிலாளர் வருகை`)}
             </h2>
-            <div className="space-y-1.5 max-h-56 overflow-y-auto">
+            <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
               {weavers.map((w) => (
-                <div key={w.id} className="flex items-center justify-between gap-2 text-xs bg-slate-50 px-2.5 py-1.5 rounded">
+                <div key={w.id} className="flex items-center justify-between gap-2 text-xs bg-slate-50 px-3 py-2 rounded-lg">
                   <span>
-                    <b>{w.full_name}</b> <span className="text-slate-500">({w.role_type})</span>
+                    <b className="text-slate-900">{w.full_name}</b> <span className="text-slate-500">({w.role_type})</span>
                   </span>
                   <select
                     value={attMap[w.id] ?? ""}
@@ -565,12 +599,12 @@ export function TodayShiftPage() {
                         return copy;
                       });
                     }}
-                    className="px-2 py-1 rounded border border-slate-300 text-xs"
+                    className="px-2.5 py-1 rounded-lg border border-slate-300 text-xs bg-white"
                   >
-                    <option value="">{tr("-- Auto from Loom --", "-- தறியில் இருந்து தானாக --")}</option>
-                    <option value="PRESENT">{tr("PRESENT (1.0)", "வந்தவர் (1.0)")}</option>
-                    <option value="HALF">{tr("HALF (0.5)", "அரை நாள் (0.5)")}</option>
-                    <option value="ABSENT">{tr("ABSENT (0.0)", "விடுப்பு (0.0)")}</option>
+                    <option value="">{tr("Auto from Loom", "தறியிலிருந்து தானாக")}</option>
+                    <option value="PRESENT">{tr("Present (1.0)", "வந்தவர் (1.0)")}</option>
+                    <option value="HALF">{tr("Half Shift (0.5)", "அரை (0.5)")}</option>
+                    <option value="ABSENT">{tr("Absent (0.0)", "விடுப்பு (0.0)")}</option>
                   </select>
                 </div>
               ))}
@@ -578,308 +612,328 @@ export function TodayShiftPage() {
             <button
               type="button"
               onClick={() => void handleSaveAttendance()}
-              className="px-3.5 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold"
+              className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold cursor-pointer"
             >
-              {tr("Save Attendance Marks", "வருகைப்பதிவை சேமி")}
+              {tr("Save Attendance", "வருகை சேமி")}
             </button>
           </div>
 
-          <div className="space-y-3">
-            <h2 className="text-sm font-bold flex items-center gap-1.5">
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 space-y-3">
+            <h2 className="text-sm font-bold flex items-center gap-1.5 text-slate-900">
               <Calendar className="w-4 h-4 text-amber-600" />
-              {tr("Shed Working Calendar", "ஆலை வேலை நாள்")} ({formatDateDMY(entryDate)})
+              {tr("Working Day / Holiday", "வேலை நாள் / விடுமுறை")} ({formatDateDMY(entryDate)})
             </h2>
-            <label className="flex items-center gap-2 text-xs font-medium">
+            <label className="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer">
               <input
                 type="checkbox"
                 checked={isWorkingDay}
                 onChange={(e) => setIsWorkingDay(e.target.checked)}
               />
-              {tr("Shed Operating Normally (Uncheck for Weekly Off / Festival Shutdown)", "ஆலை வழக்கம் போல் இயங்கும் (விடுமுறைக்கு டிக் நீக்கவும்)")}
+              {tr("Shed Operating Normally (uncheck for Holiday / Shutdown)", "ஆலை இயங்கும் (விடுமுறைக்கு டிக் நீக்கவும்)")}
             </label>
             <input
               value={calNote}
               onChange={(e) => setCalNote(e.target.value)}
-              placeholder={tr("Holiday / Maintenance note (optional)", "விடுமுறை / பராமரிப்பு குறிப்பு (விருப்பம்)")}
-              className="w-full px-3 py-2 rounded border border-slate-300 text-xs"
+              placeholder={tr("Holiday / Maintenance note (optional)", "விடுமுறை குறிப்பு (விருப்பம்)")}
+              className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs"
             />
             <button
               type="button"
               onClick={() => void handleSaveCalendar()}
-              className="px-3.5 py-1.5 rounded-lg bg-amber-600 text-white text-xs font-semibold"
+              className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold cursor-pointer"
             >
-              {tr("Update Calendar Day", "நாள்காட்டியைப் புதுப்பி")}
+              {tr("Update Calendar Day", "நாள்காட்டி புதுப்பி")}
             </button>
           </div>
         </div>
-      )}
+      ) : (
+        /* Tab 1: Clean Loom Production Cards */
+        <form noValidate onSubmit={handleSaveGrid} className="space-y-4">
+          <div className="grid md:grid-cols-2 gap-3.5">
+            {primaryRows.map((r, idx) => {
+              const swapRow = swapByLoomId.get(r.loomId);
+              const isExpanded = Boolean(expandedLoomIds[r.loomId] || swapRow || parseFloat(r.defectiveMetres || "0") > 0);
+              const stopped = isRowStopped(r);
+              const startMissing =
+                r.entryMode === "COUNTER" &&
+                ((r.startMeter === "" && r.endMeter !== "") || (attemptedSave && validRows.length === 0 && idx === 0 && r.startMeter === ""));
+              const endBad =
+                r.entryMode === "COUNTER" &&
+                ((r.startMeter !== "" && r.endMeter === "") ||
+                  (r.startMeter !== "" && r.endMeter !== "" && parseFloat(r.endMeter) < parseFloat(r.startMeter)) ||
+                  (attemptedSave && validRows.length === 0 && idx === 0 && r.endMeter === ""));
+              const directBad =
+                r.entryMode === "DIRECT" &&
+                ((r.netMetres !== "" && parseFloat(r.netMetres) < 0) || (attemptedSave && validRows.length === 0 && idx === 0 && r.netMetres === ""));
 
-      {/* Loom Shift Cards / Grid */}
-      <form noValidate onSubmit={handleSaveGrid} className="space-y-3">
-        <div className="grid md:grid-cols-2 gap-3">
-          {rows.map((r, idx) => {
-            const startMissing =
-              r.entryMode === "COUNTER" &&
-              ((r.startMeter === "" && r.endMeter !== "") || (attemptedSave && !hasValidMetresRow && idx === 0 && r.startMeter === ""));
-            const endBad =
-              r.entryMode === "COUNTER" &&
-              ((r.startMeter !== "" && r.endMeter === "") ||
-                (r.startMeter !== "" && r.endMeter !== "" && parseFloat(r.endMeter) < parseFloat(r.startMeter)) ||
-                (attemptedSave && !hasValidMetresRow && idx === 0 && r.endMeter === ""));
-            const directBad =
-              r.entryMode === "DIRECT" &&
-              ((r.netMetres !== "" && parseFloat(r.netMetres) < 0) || (attemptedSave && !hasValidMetresRow && idx === 0 && r.netMetres === ""));
-            const defectBad = isRowDefectBad(r);
-            const stopped = isRowStopped(r);
-            const hasSwap = rows.some((x) => x.loomId === r.loomId && x.isSwapExtra);
-            return (
-            <div
-              key={r.rowKey}
-              className={`p-3.5 rounded-xl border space-y-2.5 ${
-                r.isSwapExtra
-                  ? "bg-amber-50/40 border-amber-300"
-                  : stopped
-                  ? "bg-rose-50/30 border-rose-200"
-                  : "bg-white border-slate-200"
-              }`}
-            >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="font-bold text-sm text-slate-900">{r.loomNumber}</span>
-                  <span className="text-[11px] text-slate-500">{tr("Shuttle", "தறி")} · {r.ratedRpm} RPM</span>
-                  {r.existingId && (
-                    <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px] font-bold">
-                      {tr("Saved", "சேமிக்கப்பட்டது")}
-                    </span>
-                  )}
-                  {r.isSwapExtra && (
-                    <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 text-[10px] font-bold">
-                      {tr("2nd Beam (Mid-Shift)", "2வது பீம் (இடை மாற்றம்)")}
-                    </span>
-                  )}
-                  {r.activeSortName && !r.isSwapExtra && (
-                    <span className="px-1.5 py-0.5 rounded bg-blue-50 text-blue-800 text-[10px] font-semibold">
-                      {r.activeSortName} ({r.remainingBeamM ?? "?"}m {tr("left", "மீதி")})
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  {/* Clear touchable Metres / Counter pill switch */}
-                  <div
-                    className="inline-flex rounded-md border border-slate-300 bg-slate-100 p-0.5 text-[11px] font-semibold"
-                    title={tr("Metres = type cloth metres directly | Counter = enter Start & End meter readings", "மீட்டர் = நேரடி அளவு | எண் = தொடக்க & முடிவு மீட்டர்")}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => updateRow(r.rowKey, { entryMode: "DIRECT" })}
-                      className={`px-2 py-0.5 rounded cursor-pointer transition ${
-                        r.entryMode === "DIRECT"
-                          ? "bg-slate-900 text-white shadow-xs"
-                          : "text-slate-600 hover:text-slate-900"
-                      }`}
-                    >
-                      {tr("Metres", "மீட்டர்")}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => updateRow(r.rowKey, { entryMode: "COUNTER" })}
-                      className={`px-2 py-0.5 rounded cursor-pointer transition ${
-                        r.entryMode === "COUNTER"
-                          ? "bg-slate-900 text-white shadow-xs"
-                          : "text-slate-600 hover:text-slate-900"
-                      }`}
-                    >
-                      {tr("Counter", "கவுண்டர்")}
-                    </button>
-                  </div>
+              return (
+                <div
+                  key={r.rowKey}
+                  className={`p-4 rounded-2xl border space-y-3 transition ${
+                    stopped ? "bg-rose-50/35 border-rose-200" : "bg-white border-slate-200 shadow-2xs"
+                  }`}
+                >
+                  {/* Row 1: Loom Name + Active Beam + Running/Stopped */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-1.5 min-w-0">
+                      <span className="font-bold text-base text-slate-900">{r.loomNumber}</span>
+                      {r.existingId && (
+                        <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                          <CheckCircle2 className="w-3 h-3" /> {tr("Saved", "சேமிக்கப்பட்டது")}
+                        </span>
+                      )}
+                      {r.activeSortName && (
+                        <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-medium truncate max-w-[160px]">
+                          {r.activeSortName}
+                        </span>
+                      )}
+                    </div>
 
-                  {!r.isSwapExtra && !hasSwap && (
-                    <button
-                      type="button"
-                      onClick={() => addBeamSwapRow(r)}
-                      className="text-[11px] font-semibold text-amber-700 hover:underline inline-flex items-center gap-0.5 cursor-pointer"
-                      title={tr("Split row ONLY if the warp beam was changed mid-shift on this loom", "ஷிப்ட் இடையில் பீம் மாற்றினால் மட்டும்")}
-                    >
-                      <Plus className="w-3 h-3" /> {tr("Beam Swap", "பீம் மாற்றம்")}
-                    </button>
-                  )}
-                  {r.isSwapExtra && (
-                    <button
-                      type="button"
-                      onClick={() => removeSwapRow(r.rowKey)}
-                      className="text-[11px] font-semibold text-rose-600 hover:underline inline-flex items-center gap-0.5 cursor-pointer"
-                    >
-                      <X className="w-3 h-3" /> {tr("Remove", "நீக்கு")}
-                    </button>
-                  )}
-                  {isOwner && r.existingId && (
-                    <button
-                      type="button"
-                      onClick={() => setVoidTarget({ shiftId: r.existingId!, loomNumber: r.loomNumber })}
-                      className="text-[11px] font-semibold text-rose-600 hover:underline inline-flex items-center gap-0.5 cursor-pointer"
-                      title={tr("Remove saved shift entry", "சேமித்த பதிவை நீக்கு")}
-                    >
-                      <Trash2 className="w-3 h-3" /> {tr("Void", "நீக்கு")}
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="text-[10px] font-medium text-slate-500 block mb-0.5">{tr("Weaver", "நெசவாளர்")}</label>
-                  <select
-                    value={r.weaverId}
-                    onChange={(e) => updateRow(r.rowKey, { weaverId: Number(e.target.value) })}
-                    className="w-full px-2.5 py-1.5 rounded border border-slate-300 text-xs bg-white"
-                  >
-                    {weavers.map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.full_name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-[10px] font-medium text-slate-500 block mb-0.5">{tr("Warp Beam (optional)", "பீம் (விருப்பம்)")}</label>
-                  <select
-                    value={r.beamId ?? ""}
-                    onChange={(e) => updateRow(r.rowKey, { beamId: e.target.value ? Number(e.target.value) : null })}
-                    className="w-full px-2.5 py-1.5 rounded border border-slate-300 text-xs bg-white"
-                  >
-                    <option value="">{tr("-- No Beam Tag --", "-- பீம் இல்லை --")}</option>
-                    {beams
-                      .filter((b) => b.status !== "COMPLETED" || b.id === r.beamId)
-                      .map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.beam_no} ({b.sort_name})
-                        </option>
-                      ))}
-                  </select>
-                </div>
-              </div>
-
-              {r.entryMode === "COUNTER" ? (
-                <div className="grid grid-cols-3 gap-2">
-                  <div>
-                    <label className="text-[10px] text-slate-500 block">{tr("Start Meter", "தொடக்க எண்")}</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={r.startMeter}
-                      onChange={(e) => updateRow(r.rowKey, { startMeter: e.target.value })}
-                      className={`w-full px-2 py-1.5 rounded border text-xs bg-white ${startMissing ? "field-invalid" : "border-slate-300"}`}
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-500 block">{tr("End Meter", "முடிவு எண்")}</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={r.endMeter}
-                      onChange={(e) => updateRow(r.rowKey, { endMeter: e.target.value })}
-                      className={`w-full px-2 py-1.5 rounded border text-xs bg-white ${endBad ? "field-invalid" : "border-slate-300"}`}
-                    />
-                    {endBad && (
-                      <p className="text-[10px] text-rose-600 font-medium mt-0.5">
-                        {r.startMeter !== "" && r.endMeter !== "" && parseFloat(r.endMeter) < parseFloat(r.startMeter)
-                          ? tr("Must be ≥ Start", "தொடக்கத்தை விட அதிகம் தேவை")
-                          : tr("Required", "தேவை")}
-                      </p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="text-[10px] text-slate-500 block">{tr("Net Metres", "மொத்த மீட்டர்")}</label>
-                    <div className="w-full px-2 py-1.5 rounded border border-slate-200 bg-slate-50 text-xs font-bold text-slate-800 select-none">
-                      {r.netMetres || "—"}
+                    <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-[11px] font-semibold shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => toggleRowStatus(r, false)}
+                        className={`px-2.5 py-1 rounded-md cursor-pointer transition ${
+                          !stopped ? "bg-emerald-600 text-white shadow-2xs" : "text-slate-600"
+                        }`}
+                      >
+                        {tr("Running", "இயக்கம்")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleRowStatus(r, true)}
+                        className={`px-2.5 py-1 rounded-md cursor-pointer transition ${
+                          stopped ? "bg-rose-600 text-white shadow-2xs" : "text-slate-600"
+                        }`}
+                      >
+                        {tr("Stopped", "நிறுத்தம்")}
+                      </button>
                     </div>
                   </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="text-[10px] text-slate-500 block">{tr("Metres Woven", "நெய்த மீட்டர்")}</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      placeholder="e.g. 26.50"
-                      value={r.netMetres}
-                      onChange={(e) => updateRow(r.rowKey, { netMetres: e.target.value })}
-                      className={`w-full px-2.5 py-1.5 rounded border text-sm font-semibold bg-white ${directBad ? "field-invalid" : "border-slate-300"}`}
-                    />
-                    {directBad && (
-                      <p className="text-[10px] text-rose-600 font-medium mt-0.5">
-                        {r.netMetres !== "" && parseFloat(r.netMetres) < 0
-                          ? tr("Cannot be negative", "மைனஸ் ஆக இருக்கக் கூடாது")
-                          : tr("Enter metres woven", "மீட்டரை உள்ளிடவும்")}
-                      </p>
+
+                  {/* Row 2: Weaver + Metres (or Counter Start/End) */}
+                  {r.entryMode === "COUNTER" ? (
+                    <div className="space-y-2">
+                      <div>
+                        <label className="text-[11px] font-medium text-slate-500 block mb-1">{tr("Weaver", "நெசவாளர்")}</label>
+                        <select
+                          value={r.weaverId}
+                          onChange={(e) => updateRow(r.rowKey, { weaverId: Number(e.target.value) })}
+                          className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs bg-white"
+                        >
+                          {weavers.map((w) => (
+                            <option key={w.id} value={w.id}>
+                              {w.full_name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="text-[11px] text-slate-500 block mb-0.5">{tr("Start", "தொடக்கம்")}</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={r.startMeter}
+                            onChange={(e) => updateRow(r.rowKey, { startMeter: e.target.value })}
+                            className={`w-full px-2.5 py-2 rounded-lg border text-sm bg-white ${startMissing ? "field-invalid" : "border-slate-300"}`}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] text-slate-500 block mb-0.5">{tr("End", "முடிவு")}</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={r.endMeter}
+                            onChange={(e) => updateRow(r.rowKey, { endMeter: e.target.value })}
+                            className={`w-full px-2.5 py-2 rounded-lg border text-sm bg-white ${endBad ? "field-invalid" : "border-slate-300"}`}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[11px] text-slate-500 block mb-0.5">{tr("Net (m)", "மீட்டர்")}</label>
+                          <div className="w-full px-2.5 py-2 rounded-lg border border-slate-200 bg-slate-50 text-sm font-bold text-slate-900">
+                            {r.netMetres || "—"}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <div>
+                        <label className="text-[11px] font-medium text-slate-500 block mb-1">{tr("Weaver", "நெசவாளர்")}</label>
+                        <select
+                          value={r.weaverId}
+                          onChange={(e) => updateRow(r.rowKey, { weaverId: Number(e.target.value) })}
+                          className="w-full px-3 py-2 rounded-lg border border-slate-300 text-xs bg-white h-[38px]"
+                        >
+                          {weavers.map((w) => (
+                            <option key={w.id} value={w.id}>
+                              {w.full_name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[11px] font-medium text-slate-500 block mb-1">{tr("Metres Woven", "நெய்த மீட்டர்")}</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="e.g. 26.5"
+                          value={r.netMetres}
+                          onChange={(e) => updateRow(r.rowKey, { netMetres: e.target.value })}
+                          className={`w-full px-3 py-2 rounded-lg border text-sm font-bold bg-white h-[38px] ${
+                            directBad ? "field-invalid" : "border-slate-300"
+                          }`}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Row 3: Subtle expandable extras (Beam / Defect / Mid-shift split / Void) */}
+                  <div className="pt-1 border-t border-slate-100">
+                    <div className="flex items-center justify-between">
+                      <button
+                        type="button"
+                        onClick={() => setExpandedLoomIds((prev) => ({ ...prev, [r.loomId]: !isExpanded }))}
+                        className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 hover:text-slate-900 cursor-pointer"
+                      >
+                        {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                        {tr("Beam, defect & split options", "பீம், சேதம் & கூடுதல்")}
+                      </button>
+                      {isOwner && r.existingId && (
+                        <button
+                          type="button"
+                          onClick={() => setVoidTarget({ shiftId: r.existingId!, loomNumber: r.loomNumber })}
+                          className="text-[11px] font-semibold text-rose-600 hover:underline inline-flex items-center gap-0.5 cursor-pointer"
+                        >
+                          <Trash2 className="w-3 h-3" /> {tr("Void", "நீக்கு")}
+                        </button>
+                      )}
+                    </div>
+
+                    {isExpanded && (
+                      <div className="mt-2.5 space-y-2.5 pt-2 border-t border-slate-100">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[10px] font-medium text-slate-500 block mb-0.5">{tr("Warp Beam", "பீம்")}</label>
+                            <select
+                              value={r.beamId ?? ""}
+                              onChange={(e) => updateRow(r.rowKey, { beamId: e.target.value ? Number(e.target.value) : null })}
+                              className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs bg-white"
+                            >
+                              <option value="">{tr("-- No Beam --", "-- பீம் இல்லை --")}</option>
+                              {beams
+                                .filter((b) => b.status !== "COMPLETED" || b.id === r.beamId)
+                                .map((b) => (
+                                  <option key={b.id} value={b.id}>
+                                    {b.beam_no} ({b.sort_name})
+                                  </option>
+                                ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-[10px] font-medium text-slate-500 block mb-0.5">{tr("Defect Metres", "சேத மீட்டர்")}</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={r.defectiveMetres}
+                              onChange={(e) => updateRow(r.rowKey, { defectiveMetres: e.target.value })}
+                              className="w-full px-2.5 py-1.5 rounded-lg border border-slate-300 text-xs bg-white"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Optional Mid-Shift 2nd Beam nested cleanly inside the SAME loom card */}
+                        {!swapRow ? (
+                          <div className="flex items-center justify-between gap-2 bg-slate-50 px-2.5 py-2 rounded-lg">
+                            <span className="text-[11px] text-slate-500">
+                              {tr("Beam finished mid-shift?", "ஷிப்ட் இடையில் புதிய பீம் ஏற்றியதா?")}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => addMidShiftSecondBeam(r)}
+                              className="text-[11px] font-semibold text-amber-700 hover:underline inline-flex items-center gap-0.5 shrink-0 cursor-pointer"
+                            >
+                              <Plus className="w-3 h-3" /> {tr("Add 2nd Beam", "2வது பீம் சேர்")}
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-2.5 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-bold text-amber-900">
+                                {tr(`Part 2 — New Beam on ${r.loomNumber}`, `பகுதி 2 — ${r.loomNumber} புதிய பீம்`)}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => removeSwapRow(swapRow.rowKey)}
+                                className="text-[11px] font-semibold text-rose-600 hover:underline inline-flex items-center gap-0.5 cursor-pointer"
+                              >
+                                <X className="w-3 h-3" /> {tr("Remove", "நீக்கு")}
+                              </button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <select
+                                value={swapRow.beamId ?? ""}
+                                onChange={(e) => updateRow(swapRow.rowKey, { beamId: e.target.value ? Number(e.target.value) : null })}
+                                className="px-2 py-1.5 rounded-lg border border-amber-300 text-xs bg-white"
+                              >
+                                <option value="">{tr("Pick new beam...", "புதிய பீம் தேர்வு...")}</option>
+                                {beams
+                                  .filter((b) => b.status !== "COMPLETED" || b.id === swapRow.beamId)
+                                  .map((b) => (
+                                    <option key={b.id} value={b.id}>
+                                      {b.beam_no} ({b.sort_name})
+                                    </option>
+                                  ))}
+                              </select>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                placeholder={tr("Part 2 metres", "பகுதி 2 மீட்டர்")}
+                                value={swapRow.netMetres}
+                                onChange={(e) => updateRow(swapRow.rowKey, { netMetres: e.target.value })}
+                                className="px-2.5 py-1.5 rounded-lg border border-amber-300 text-xs font-semibold bg-white"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     )}
                   </div>
-                  <div>
-                    <label className="text-[10px] text-slate-500 block">{tr("Confirmed Defect (m, optional)", "சேதமான மீட்டர் (விருப்பம்)")}</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={r.defectiveMetres}
-                      onChange={(e) => updateRow(r.rowKey, { defectiveMetres: e.target.value })}
-                      className={`w-full px-2.5 py-1.5 rounded border text-sm bg-white ${defectBad ? "field-invalid" : "border-slate-300"}`}
-                    />
-                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Clear Sticky-Style Save Bar with Instant Inline Status */}
+          <div className="sticky bottom-16 md:bottom-3 z-10 bg-white/95 backdrop-blur border border-slate-200 shadow-lg p-3.5 rounded-2xl flex flex-wrap items-center justify-between gap-3">
+            <div className="space-y-0.5">
+              <div className="text-xs text-slate-600">
+                <b className="text-slate-900">{validRows.length}</b> / {rows.length} {tr("looms ready", "தறிகள் தயார்")} ·{" "}
+                <b className="text-slate-900">{totalMetresEntered.toFixed(1)} m</b>
+              </div>
+              {lastSavedText && (
+                <div className="text-[11px] font-semibold text-emerald-700 flex items-center gap-1">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> {lastSavedText}
                 </div>
               )}
-
-              {/* Simple Running / Stopped Toggle */}
-              <div className="flex items-center justify-between pt-1 border-t border-slate-100">
-                <span className="text-[11px] font-medium text-slate-500">{tr("Loom Status in Shift:", "தறி நிலை:")}</span>
-                <div className="inline-flex rounded-lg border border-slate-300 bg-slate-100 p-0.5 text-xs font-semibold">
-                  <button
-                    type="button"
-                    onClick={() => toggleRowStatus(r, false)}
-                    className={`px-3 py-1 rounded-md cursor-pointer transition ${
-                      !stopped
-                        ? "bg-emerald-600 text-white shadow-xs"
-                        : "text-slate-600 hover:text-slate-900"
-                    }`}
-                  >
-                    ● {tr("Running", "இயங்குகிறது")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => toggleRowStatus(r, true)}
-                    className={`px-3 py-1 rounded-md cursor-pointer transition ${
-                      stopped
-                        ? "bg-rose-600 text-white shadow-xs"
-                        : "text-slate-600 hover:text-slate-900"
-                    }`}
-                  >
-                    ■ {tr("Stopped", "நிறுத்தம்")}
-                  </button>
-                </div>
-              </div>
             </div>
-            );
-          })}
-        </div>
-
-        <div className="mt-4 pt-3 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 rounded-xl border">
-          <div className="text-xs text-slate-600">
-            {tr("Total Cloth in Grid", "மொத்த துணி")} (<span className="font-semibold text-slate-900">{formatDateDMY(entryDate)} · {tr(`Shift ${shiftNo}`, `ஷிப்ட் ${shiftNo}`)}</span>):{" "}
-            <span className="font-bold text-slate-900">{totalMetresEntered.toFixed(1)} m</span>
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 active:scale-[0.98] text-slate-950 font-bold text-sm shadow-sm inline-flex items-center gap-2 disabled:opacity-50 cursor-pointer transition"
+            >
+              <Save className="w-4 h-4" />
+              {saving
+                ? tr("Saving...", "சேமிக்கிறது...")
+                : tr(`Save Shift ${shiftNo}`, `ஷிப்ட் ${shiftNo} சேமி`)}
+            </button>
           </div>
-          <button
-            type="submit"
-            disabled={saving}
-            className="px-6 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm shadow-sm inline-flex items-center gap-2 disabled:opacity-50 cursor-pointer"
-          >
-            <Save className="w-4 h-4" />
-            {saving
-              ? tr("Saving Shift...", "சேமிக்கப்படுகிறது...")
-              : tr(`Save Shift ${shiftNo} (${formatDateDMY(entryDate)})`, `ஷிப்ட் ${shiftNo} சேமி (${formatDateDMY(entryDate)})`)}
-          </button>
-        </div>
-      </form>
+        </form>
+      )}
     </div>
   );
 }

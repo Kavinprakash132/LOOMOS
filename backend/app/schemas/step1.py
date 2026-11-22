@@ -28,6 +28,8 @@ class LoomGroupInput(BaseModel):
     make_model: str = Field(default="", max_length=80)
     rated_rpm: int = Field(default=160, ge=40, le=2500)
     reed_space_in: int = Field(default=56, ge=20, le=220)
+    cloth_width_in: Decimal | None = Field(default=None, gt=0, le=220)
+    default_pick: int | None = Field(default=None, ge=1, le=500)
 
 
 class HistoricalEbSeedRow(BaseModel):
@@ -244,6 +246,8 @@ class LoomCreate(BaseModel):
     make_model: str = Field(default="", max_length=80)
     rated_rpm: int = Field(default=160, ge=40, le=2500)
     reed_space_in: int = Field(default=56, ge=20, le=220)
+    cloth_width_in: Decimal | None = Field(default=None, gt=0, le=220)
+    default_pick: int | None = Field(default=None, ge=1, le=500)
     status: LoomStatus = "OPERATIONAL"
 
 
@@ -253,6 +257,8 @@ class LoomUpdate(BaseModel):
     make_model: str | None = Field(default=None, max_length=80)
     rated_rpm: int | None = Field(default=None, ge=40, le=2500)
     reed_space_in: int | None = Field(default=None, ge=20, le=220)
+    cloth_width_in: Decimal | None = Field(default=None, gt=0, le=220)
+    default_pick: int | None = Field(default=None, ge=1, le=500)
     status: LoomStatus | None = None
     is_active: bool | None = None
 
@@ -266,6 +272,8 @@ class LoomResponse(BaseModel):
     make_model: str
     rated_rpm: int
     reed_space_in: int
+    cloth_width_in: Decimal | None = None
+    default_pick: int | None = None
     status: LoomStatus
     is_active: bool
 

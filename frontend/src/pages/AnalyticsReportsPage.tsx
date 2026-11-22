@@ -5,6 +5,7 @@ import { apiRequest, downloadProtectedFile, formatDateDMY, formatRupeesFromPaise
 import { PageGuideBanner } from "../components/PageGuideBanner";
 import { TechnicalDetailsToggle } from "../components/TechnicalDetailsToggle";
 import { useAuth } from "../context/AuthContext";
+import { useLiveRefresh } from "../hooks/useLiveRefresh";
 import { Trader } from "../types/api";
 
 interface BeamEtaRow {
@@ -324,6 +325,13 @@ export function AnalyticsReportsPage() {
     void loadOwnerReports();
   }, [loadOverview, loadOwnerReports]);
 
+  const reloadAll = useCallback(() => {
+    void loadOverview();
+    void loadOwnerReports();
+  }, [loadOverview, loadOwnerReports]);
+
+  useLiveRefresh(reloadAll);
+
   const runCustomSimulation = async (presetCount?: number) => {
     const countToUse = presetCount ?? simLooms;
     if (presetCount) setSimLooms(presetCount);
@@ -387,44 +395,52 @@ export function AnalyticsReportsPage() {
         }
       />
 
-      <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-2 no-print">
+      <div className="flex flex-wrap items-center gap-1 border-b border-slate-200 no-print">
         <button
           type="button"
           onClick={() => setTab("forecast")}
-          className={`px-3.5 py-2 rounded-lg text-xs font-semibold cursor-pointer ${
-            tab === "forecast" ? "bg-slate-900 text-white" : "bg-white border border-slate-200 text-slate-700"
+          className={`px-3.5 py-2.5 text-xs font-semibold border-b-2 -mb-px transition cursor-pointer ${
+            tab === "forecast"
+              ? "border-slate-900 text-slate-900"
+              : "border-transparent text-slate-500 hover:text-slate-800"
           }`}
         >
-          {tr("1. Forecast, Beam ETA & Anomalies", "1. கணிப்பு, பீம் ETA & எச்சரிக்கை")}
+          {tr("Forecast & Beam ETA", "கணிப்பு & பீம் ETA")}
         </button>
         <button
           type="button"
           onClick={() => setTab("eb")}
-          className={`px-3.5 py-2 rounded-lg text-xs font-semibold cursor-pointer ${
-            tab === "eb" ? "bg-slate-900 text-white" : "bg-white border border-slate-200 text-slate-700"
+          className={`px-3.5 py-2.5 text-xs font-semibold border-b-2 -mb-px transition cursor-pointer ${
+            tab === "eb"
+              ? "border-slate-900 text-slate-900"
+              : "border-transparent text-slate-500 hover:text-slate-800"
           }`}
         >
-          {tr("2. EB Bill & Power Efficiency", "2. EB பில் & மின் திறன்")}
+          {tr("EB Bill & Power Efficiency", "EB பில் & மின் திறன்")}
         </button>
         {isOwner && (
           <>
             <button
               type="button"
               onClick={() => setTab("reports")}
-              className={`px-3.5 py-2 rounded-lg text-xs font-semibold cursor-pointer ${
-                tab === "reports" ? "bg-slate-900 text-white" : "bg-white border border-slate-200 text-slate-700"
+              className={`px-3.5 py-2.5 text-xs font-semibold border-b-2 -mb-px transition cursor-pointer ${
+                tab === "reports"
+                  ? "border-slate-900 text-slate-900"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
               }`}
             >
-              {tr("3. Excel (.xlsx) & Print Statements", "3. எக்செல் (.xlsx) & அறிக்கை")}
+              {tr("Excel & Print Statements", "எக்செல் & அறிக்கை")}
             </button>
             <button
               type="button"
               onClick={() => setTab("simulator")}
-              className={`px-3.5 py-2 rounded-lg text-xs font-semibold cursor-pointer ${
-                tab === "simulator" ? "bg-slate-900 text-white" : "bg-white border border-slate-200 text-slate-700"
+              className={`px-3.5 py-2.5 text-xs font-semibold border-b-2 -mb-px transition cursor-pointer ${
+                tab === "simulator"
+                  ? "border-slate-900 text-slate-900"
+                  : "border-transparent text-slate-500 hover:text-slate-800"
               }`}
             >
-              {tr("4. Loom Expansion Simulator (20–100 Looms)", "4. தறி விரிவாக்கக் கணக்கீடு (20–100)")}
+              {tr("Expansion Simulator", "தறி விரிவாக்கம்")}
             </button>
           </>
         )}

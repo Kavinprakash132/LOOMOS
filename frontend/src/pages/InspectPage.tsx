@@ -4,6 +4,8 @@ import { apiRequest, formatDateTimeIST } from "../api/client";
 import { PageGuideBanner } from "../components/PageGuideBanner";
 import { TechnicalDetailsToggle } from "../components/TechnicalDetailsToggle";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
+import { useLiveRefresh } from "../hooks/useLiveRefresh";
 import { Beam, InspectionRecord, Loom, ModelCardResponse, Weaver } from "../types/api";
 
 const DEFECT_LABEL_OPTIONS: { value: string; ta: string }[] = [
@@ -23,6 +25,7 @@ const DEFECT_VALUES = DEFECT_LABEL_OPTIONS.map((o) => o.value);
 
 export function InspectPage() {
   const { tr } = useAuth();
+  const toast = useToast();
   const [card, setCard] = useState<ModelCardResponse | null>(null);
   const [inspections, setInspections] = useState<InspectionRecord[]>([]);
   const [looms, setLooms] = useState<Loom[]>([]);
@@ -81,6 +84,8 @@ export function InspectPage() {
     void loadAll();
   }, [loadAll]);
 
+  useLiveRefresh(loadAll);
+
   const runAnalyze = async ({ file, sampleId }: { file?: File; sampleId?: string }) => {
     setError(null);
     setSuccess(null);
@@ -100,9 +105,16 @@ export function InspectPage() {
       setActive(rec);
       setViewMode("heatmap");
       syncReviewDefaults(rec);
+      toast.info(
+        rec.prediction?.predicted_label === "Defect Flagged"
+          ? tr("AI flagged a possible defect — please verify below.", "AI குறைபாட்டைக் காட்டியுள்ளது — கீழே சரிபார்க்கவும்.")
+          : tr("AI scan complete — cloth looks clean.", "AI ஆய்வு முடிந்தது — துணி சுத்தமாகத் தெரிகிறது.")
+      );
       await loadAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : tr("Could not analyze cloth photo", "துணி புகைப்படத்தை ஆய்வு செய்ய முடியவில்லை"));
+      const msg = err instanceof Error ? err.message : tr("Could not analyze cloth photo", "துணி புகைப்படத்தை ஆய்வு செய்ய முடியவில்லை");
+      setError(msg);
+      toast.error(msg);
     } finally {
       setAnalyzing(false);
     }
@@ -143,7 +155,7 @@ export function InspectPage() {
         }),
       });
       setActive(updated);
-      setSuccess(
+      const savedMsg =
         reviewStatus === "CONFIRMED_DEFECT"
           ? tr(
               `Saved Confirmed Defect (${updated.reviewed_label})${
@@ -153,11 +165,14 @@ export function InspectPage() {
                 updated.shift_entry_id ? " மற்றும் இன்றைய ஷிப்ட் பதிவிலும் சேர்க்கப்பட்டது." : "."
               }`
             )
-          : tr("Saved Confirmed Clean Cloth photo for dataset tracking.", "சுத்தமான துணி என உறுதிசெய்யப்பட்டு சேமிக்கப்பட்டது.")
-      );
+          : tr("Saved Confirmed Clean Cloth photo for dataset tracking.", "சுத்தமான துணி என உறுதிசெய்யப்பட்டு சேமிக்கப்பட்டது.");
+      setSuccess(savedMsg);
+      toast.success(savedMsg);
       await loadAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : tr("Failed to save inspection review", "ஆய்வு முடிவை சேமிக்க முடியவில்லை"));
+      const msg = err instanceof Error ? err.message : tr("Failed to save inspection review", "ஆய்வு முடிவை சேமிக்க முடியவில்லை");
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSavingReview(false);
     }

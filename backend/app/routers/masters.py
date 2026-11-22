@@ -95,7 +95,7 @@ def create_loom(
         entity_id=loom.id,
         action="CREATE",
         changed_by=owner.id,
-        new_values=snapshot_fields(loom, ["loom_number", "loom_type", "rated_rpm", "status"]),
+        new_values=snapshot_fields(loom, ["loom_number", "loom_type", "rated_rpm", "reed_space_in", "cloth_width_in", "default_pick", "status"]),
     )
     db.commit()
     db.refresh(loom)
@@ -120,6 +120,8 @@ def bulk_create_looms(
             make_model=group.make_model.strip(),
             rated_rpm=group.rated_rpm,
             reed_space_in=group.reed_space_in,
+            cloth_width_in=group.cloth_width_in,
+            default_pick=group.default_pick,
             status="OPERATIONAL",
             created_by=owner.id,
         )
@@ -164,7 +166,7 @@ def update_loom(
         entity_id=loom.id,
         user_id=owner.id,
         updates=updates,
-        fields=["loom_number", "loom_type", "make_model", "rated_rpm", "reed_space_in", "status", "is_active"],
+        fields=["loom_number", "loom_type", "make_model", "rated_rpm", "reed_space_in", "cloth_width_in", "default_pick", "status", "is_active"],
     )
     db.commit()
     db.refresh(loom)

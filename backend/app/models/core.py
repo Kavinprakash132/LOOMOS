@@ -180,6 +180,8 @@ class Loom(Base, TimestampAuditMixin):
     make_model: Mapped[str] = mapped_column(String(80), default="", nullable=False)
     rated_rpm: Mapped[int] = mapped_column(Integer, default=160, nullable=False)
     reed_space_in: Mapped[int] = mapped_column(Integer, default=56, nullable=False)
+    cloth_width_in: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
+    default_pick: Mapped[int | None] = mapped_column(Integer, nullable=True)
     status: Mapped[str] = mapped_column(String(25), default="OPERATIONAL", nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
 

@@ -77,6 +77,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const logout = useCallback(() => {
+    try {
+      for (const key of Object.keys(sessionStorage)) {
+        if (key.startsWith("loomos_ai_chat_")) sessionStorage.removeItem(key);
+      }
+    } catch {
+      // ignore storage errors
+    }
     setStoredToken(null);
     setUser(null);
   }, []);

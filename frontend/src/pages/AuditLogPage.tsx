@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { apiRequest, formatDateDMY, formatDateTimeIST, formatHoursFromMins, formatRupeesFromPaise } from "../api/client";
 import { PageGuideBanner } from "../components/PageGuideBanner";
 import { useAuth } from "../context/AuthContext";
+import { useLiveRefresh } from "../hooks/useLiveRefresh";
 import { AuditLogEntry } from "../types/api";
 
 const FIELD_LABELS: Record<string, string> = {
@@ -14,6 +15,9 @@ const FIELD_LABELS: Record<string, string> = {
   loom_number: "Loom No",
   loom_type: "Type",
   rated_rpm: "Speed (RPM)",
+  reed_space_in: "Reed Space (in)",
+  cloth_width_in: "Cloth Width (in)",
+  default_pick: "Pick (PPI)",
   status: "Status",
   sort_name: "Fabric Sort",
   agreed_rate_paise: "Agreed Rate",
@@ -84,19 +88,22 @@ export function AuditLogPage() {
   const [entityFilter, setEntityFilter] = useState("");
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      try {
-        const qs = entityFilter ? `?entity_type=${encodeURIComponent(entityFilter)}` : "";
-        const data = await apiRequest<AuditLogEntry[]>(`/audit-logs${qs}`);
-        setLogs(data);
-      } finally {
-        setLoading(false);
-      }
-    };
-    void load();
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const qs = entityFilter ? `?entity_type=${encodeURIComponent(entityFilter)}` : "";
+      const data = await apiRequest<AuditLogEntry[]>(`/audit-logs${qs}`);
+      setLogs(data);
+    } finally {
+      setLoading(false);
+    }
   }, [entityFilter]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  useLiveRefresh(load);
 
   return (
     <div className="space-y-4">

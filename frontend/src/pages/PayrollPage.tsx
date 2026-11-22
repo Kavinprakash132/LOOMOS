@@ -11,6 +11,8 @@ import {
 import { ConfirmVoidModal } from "../components/ConfirmVoidModal";
 import { PageGuideBanner } from "../components/PageGuideBanner";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
+import { useLiveRefresh } from "../hooks/useLiveRefresh";
 import {
   AdvanceRecord,
   PayslipLinePreview,
@@ -22,6 +24,7 @@ import {
 
 export function PayrollPage() {
   const { t, tr } = useAuth();
+  const toast = useToast();
   const [tab, setTab] = useState<"calc" | "advances" | "slips">("calc");
   const [weavers, setWeavers] = useState<Weaver[]>([]);
   const [advances, setAdvances] = useState<AdvanceRecord[]>([]);
@@ -67,6 +70,8 @@ export function PayrollPage() {
   useEffect(() => {
     void loadAll();
   }, [loadAll]);
+
+  useLiveRefresh(loadAll);
 
   const getRowDefectPaise = (p: PayslipLinePreview): number => {
     const raw = defectRupees[p.weaver_id];
@@ -131,11 +136,15 @@ export function PayrollPage() {
         }),
       });
       setPreview([]);
-      setSuccess(tr("Finalized payslips saved as immutable snapshots.", "இறுதி சம்பள சீட்டுகள் சேமிக்கப்பட்டன."));
+      const msg = tr("Finalized payslips saved.", "இறுதி சம்பள சீட்டுகள் சேமிக்கப்பட்டன.");
+      setSuccess(msg);
+      toast.success(msg);
       setTab("slips");
       await loadAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : tr("Failed to finalize payslips", "சம்பள சீட்டுகளை இறுதி செய்ய முடியவில்லை"));
+      const msg = err instanceof Error ? err.message : tr("Failed to finalize payslips", "சம்பள சீட்டுகளை இறுதி செய்ய முடியவில்லை");
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
@@ -146,7 +155,9 @@ export function PayrollPage() {
     if (submitting) return;
     const advNum = parseFloat(advAmountRs);
     if (!Number.isFinite(advNum) || advNum <= 0) {
-      setError(tr("Enter a valid advance amount.", "சரியான முன்பண தொகையை உள்ளிடவும்."));
+      const msg = tr("Enter a valid advance amount.", "சரியான முன்பண தொகையை உள்ளிடவும்.");
+      setError(msg);
+      toast.error(msg);
       return;
     }
     setSubmitting(true);
@@ -162,10 +173,14 @@ export function PayrollPage() {
         }),
       });
       setAdvNote("");
-      setSuccess(tr("Advance recorded.", "முன்பணம் பதிவு செய்யப்பட்டது."));
+      const msg = tr("Advance recorded.", "முன்பணம் பதிவு செய்யப்பட்டது.");
+      setSuccess(msg);
+      toast.success(msg);
       await loadAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : tr("Failed to record advance", "முன்பணத்தை பதிவு செய்ய முடியவில்லை"));
+      const msg = err instanceof Error ? err.message : tr("Failed to record advance", "முன்பணத்தை பதிவு செய்ய முடியவில்லை");
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
@@ -180,11 +195,15 @@ export function PayrollPage() {
       await apiRequest(endpoint, { method: "DELETE", body: JSON.stringify({ reason }) });
       const label = voidTarget.label;
       setVoidTarget(null);
-      setSuccess(tr(`Voided ${label} cleanly.`, `${label} நீக்கப்பட்டது.`));
+      const msg = tr(`Voided ${label}.`, `${label} நீக்கப்பட்டது.`);
+      setSuccess(msg);
+      toast.success(msg);
       await loadAll();
     } catch (err) {
       setVoidTarget(null);
-      setError(err instanceof Error ? err.message : tr(`Failed to void ${voidTarget.label}`, `${voidTarget.label} நீக்க முடியவில்லை`));
+      const msg = err instanceof Error ? err.message : tr(`Failed to void ${voidTarget.label}`, `${voidTarget.label} நீக்க முடியவில்லை`);
+      setError(msg);
+      toast.error(msg);
     }
   };
 
@@ -251,18 +270,20 @@ export function PayrollPage() {
         ]}
       />
 
-      <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-2 no-print">
+      <div className="flex flex-wrap items-center gap-1 border-b border-slate-200 no-print">
         {[
-          { id: "calc", label: tr("1. Calculate Weekly Payroll", "1. வார கூலி கணக்கீடு") },
-          { id: "advances", label: tr(`2. Advances / Uthaav (${advances.length})`, `2. அட்வான்ஸ் / உதாவ் (${advances.length})`) },
-          { id: "slips", label: tr(`3. Finalized Slips & Print (${slips.length})`, `3. இறுதி ரசீதுகள் & அச்சு (${slips.length})`) },
+          { id: "calc", label: tr("Weekly Wages", "வார கூலி கணக்கீடு") },
+          { id: "advances", label: tr(`Advances / Uthaav (${advances.length})`, `அட்வான்ஸ் / உதாவ் (${advances.length})`) },
+          { id: "slips", label: tr(`Saved Payslips (${slips.length})`, `இறுதி ரசீதுகள் (${slips.length})`) },
         ].map((item) => (
           <button
             key={item.id}
             type="button"
             onClick={() => setTab(item.id as "calc" | "advances" | "slips")}
-            className={`px-3.5 py-2 rounded-lg text-xs font-semibold ${
-              tab === item.id ? "bg-slate-900 text-white" : "bg-white border border-slate-200 text-slate-700"
+            className={`px-3.5 py-2.5 text-xs font-semibold border-b-2 -mb-px transition cursor-pointer ${
+              tab === item.id
+                ? "border-slate-900 text-slate-900"
+                : "border-transparent text-slate-500 hover:text-slate-800"
             }`}
           >
             {item.label}

@@ -27,6 +27,8 @@ export interface LoomGroupInput {
   make_model: string;
   rated_rpm: number;
   reed_space_in: number;
+  cloth_width_in?: number | null;
+  default_pick?: number | null;
 }
 
 export interface HistoricalEbSeedRow {
@@ -153,6 +155,8 @@ export interface Loom {
   make_model: string;
   rated_rpm: number;
   reed_space_in: number;
+  cloth_width_in?: string | number | null;
+  default_pick?: number | null;
   status: LoomStatus;
   is_active: boolean;
 }

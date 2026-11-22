@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   Camera,
+  Check,
   CheckCircle2,
+  Copy,
   ImagePlus,
   Loader2,
   RotateCcw,
@@ -15,6 +17,7 @@ import {
 } from "lucide-react";
 import { apiRequest } from "../api/client";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
 import { AssistantChatResponse, ExecuteAiActionResponse, PendingAiAction } from "../types/api";
 
 interface ActionState extends PendingAiAction {
@@ -89,17 +92,63 @@ function renderFormattedText(text: string): React.ReactNode {
 
 export default function AiCopilotDrawer() {
   const { user, lang, tr } = useAuth();
+  const toast = useToast();
+  const storageKey = user?.username ? `loomos_ai_chat_${user.username}` : null;
+
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"fast" | "deep">("fast");
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    if (!storageKey) return [];
+    try {
+      const raw = sessionStorage.getItem(storageKey);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw) as ChatMessage[];
+      return Array.isArray(parsed) ? parsed.slice(-40) : [];
+    } catch {
+      return [];
+    }
+  });
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [attachedFile, setAttachedFile] = useState<File | null>(null);
   const [attachedPreview, setAttachedPreview] = useState<string | null>(null);
 
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
   const galleryInputRef = useRef<HTMLInputElement | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
+
+  // Persist current chat across page refreshes in private per-tab sessionStorage
+  useEffect(() => {
+    if (!storageKey) return;
+    try {
+      const serializable = messages.slice(-40).map((m) => ({
+        ...m,
+        // Drop ephemeral blob: preview URLs that won't survive reload
+        imagePreviewUrl: undefined,
+      }));
+      sessionStorage.setItem(storageKey, JSON.stringify(serializable));
+    } catch {
+      // ignore quota/storage errors
+    }
+  }, [messages, storageKey]);
+
+  const copyText = async (id: string, text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      ta.remove();
+    }
+    setCopiedId(id);
+    window.setTimeout(() => setCopiedId((cur) => (cur === id ? null : cur)), 1500);
+  };
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -268,8 +317,10 @@ export default function AiCopilotDrawer() {
         )
       );
       window.dispatchEvent(new Event("loomos:data-updated"));
+      toast.success(res.summary || tr("Change applied & saved.", "மாற்றம் சேமிக்கப்பட்டது."));
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Action failed.";
+      toast.error(msg);
       setMessages((prev) =>
         prev.map((m) =>
           m.id !== msgId
@@ -364,9 +415,12 @@ export default function AiCopilotDrawer() {
                 {messages.length > 0 && (
                   <button
                     type="button"
-                    onClick={() => setMessages([])}
+                    onClick={() => {
+                      setMessages([]);
+                      if (storageKey) sessionStorage.removeItem(storageKey);
+                    }}
                     className="p-1.5 rounded-lg text-slate-300 hover:bg-slate-800 hover:text-white cursor-pointer"
-                    title={tr("New chat", "புதிய உரையாடல்")}
+                    title={tr("Clear chat", "உரையாடலை அழி")}
                   >
                     <RotateCcw className="w-4 h-4" />
                   </button>
@@ -426,7 +480,7 @@ export default function AiCopilotDrawer() {
                   className={`flex flex-col ${m.role === "user" ? "items-end" : "items-start"}`}
                 >
                   <div
-                    className={`max-w-[90%] rounded-2xl px-3.5 py-2.5 shadow-2xs ${
+                    className={`max-w-[90%] rounded-2xl px-3.5 py-2.5 shadow-2xs select-text ${
                       m.role === "user"
                         ? "bg-slate-900 text-white rounded-br-sm"
                         : m.isError
@@ -447,18 +501,47 @@ export default function AiCopilotDrawer() {
                       renderFormattedText(m.content)
                     )}
 
-                    {m.role === "assistant" && !m.isError && m.modelUsed && (
-                      <div className="mt-2 pt-1.5 border-t border-slate-100 flex items-center flex-wrap gap-1.5 text-[10px] text-slate-400">
-                        <span className="font-mono">{m.modelUsed}</span>
-                        {m.toolsUsed && m.toolsUsed.length > 0 && (
+                    <div
+                      className={`mt-1.5 pt-1 border-t flex items-center justify-between gap-2 text-[10px] ${
+                        m.role === "user"
+                          ? "border-white/10 text-slate-400"
+                          : "border-slate-100 text-slate-400"
+                      }`}
+                    >
+                      <div className="flex items-center flex-wrap gap-1.5 min-w-0">
+                        {m.role === "assistant" && !m.isError && m.modelUsed && (
+                          <span className="font-mono truncate">{m.modelUsed}</span>
+                        )}
+                        {m.role === "assistant" && !m.isError && m.toolsUsed && m.toolsUsed.length > 0 && (
                           <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">
                             <Wrench className="w-2.5 h-2.5" />
-                            {m.toolsUsed.length} {tr("live tool", "கருவி")}
-                            {m.toolsUsed.length > 1 && lang === "en" ? "s" : ""}
+                            {m.toolsUsed.length}
                           </span>
                         )}
                       </div>
-                    )}
+                      <button
+                        type="button"
+                        onClick={() => void copyText(m.id, m.content)}
+                        className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded transition cursor-pointer shrink-0 ${
+                          m.role === "user"
+                            ? "hover:bg-white/10 text-slate-300 hover:text-white"
+                            : "hover:bg-slate-100 text-slate-500 hover:text-slate-900"
+                        }`}
+                        title={tr("Copy message", "நகலெடு")}
+                      >
+                        {copiedId === m.id ? (
+                          <>
+                            <Check className="w-3 h-3 text-emerald-400" />
+                            <span className="text-emerald-500 font-semibold">{tr("Copied", "நகலெடுக்கப்பட்டது")}</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3 h-3" />
+                            <span>{tr("Copy", "நகலெடு")}</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
 
                   {/* Safe Confirm / Cancel Preview Cards */}
@@ -509,17 +592,10 @@ export default function AiCopilotDrawer() {
                           )}
 
                           {act.status === "executed" && (
-                            <div className="flex items-center justify-between pt-1">
+                            <div className="pt-1">
                               <span className="text-[11px] text-emerald-700 font-medium">
-                                {tr("Saved with Audit Log ✓", "மாற்றப் பதிவில் சேமிக்கப்பட்டது ✓")}
+                                {tr("Saved & screen refreshed automatically ✓", "சேமிக்கப்பட்டு பக்கம் தானாக புதுப்பிக்கப்பட்டது ✓")}
                               </span>
-                              <button
-                                type="button"
-                                onClick={() => window.location.reload()}
-                                className="text-[11px] font-semibold text-emerald-800 underline cursor-pointer"
-                              >
-                                {tr("Refresh screen", "பக்கத்தை புதுப்பி")}
-                              </button>
                             </div>
                           )}
 

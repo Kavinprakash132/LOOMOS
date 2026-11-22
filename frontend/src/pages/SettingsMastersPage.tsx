@@ -7,6 +7,8 @@ import { TeamUnitTab } from "../components/masters/TeamUnitTab";
 import { TradersSortsTab } from "../components/masters/TradersSortsTab";
 import { WeaversTab } from "../components/masters/WeaversTab";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
+import { useLiveRefresh } from "../hooks/useLiveRefresh";
 import {
   EbTariffPlan,
   FabricSort,
@@ -22,6 +24,7 @@ type TabId = "looms" | "weavers" | "traders_sorts" | "eb_stops" | "team";
 
 export function SettingsMastersPage() {
   const { t, tr, refreshState } = useAuth();
+  const toast = useToast();
   const [tab, setTab] = useState<TabId>("looms");
   const [error, setError] = useState<string | null>(null);
   const [looms, setLooms] = useState<Loom[]>([]);
@@ -63,6 +66,16 @@ export function SettingsMastersPage() {
     void loadAll();
   }, [loadAll]);
 
+  useLiveRefresh(loadAll);
+
+  const handleError = useCallback(
+    (msg: string) => {
+      setError(msg);
+      toast.error(msg);
+    },
+    [toast]
+  );
+
   const handleRefresh = async () => {
     await loadAll();
     await refreshState();
@@ -95,16 +108,16 @@ export function SettingsMastersPage() {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-2">
+      <div className="flex flex-wrap items-center gap-1 border-b border-slate-200">
         {tabs.map((item) => (
           <button
             key={item.id}
             type="button"
             onClick={() => setTab(item.id)}
-            className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition ${
+            className={`px-3.5 py-2.5 text-xs font-semibold border-b-2 -mb-px transition cursor-pointer ${
               tab === item.id
-                ? "bg-slate-900 text-white"
-                : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-100"
+                ? "border-slate-900 text-slate-900"
+                : "border-transparent text-slate-500 hover:text-slate-800"
             }`}
           >
             {item.label}
@@ -112,16 +125,16 @@ export function SettingsMastersPage() {
         ))}
       </div>
 
-      {tab === "looms" && <LoomsTab looms={looms} onRefresh={handleRefresh} onError={setError} />}
-      {tab === "weavers" && <WeaversTab weavers={weavers} onRefresh={handleRefresh} onError={setError} />}
+      {tab === "looms" && <LoomsTab looms={looms} onRefresh={handleRefresh} onError={handleError} />}
+      {tab === "weavers" && <WeaversTab weavers={weavers} onRefresh={handleRefresh} onError={handleError} />}
       {tab === "traders_sorts" && (
-        <TradersSortsTab traders={traders} sorts={sorts} onRefresh={handleRefresh} onError={setError} />
+        <TradersSortsTab traders={traders} sorts={sorts} onRefresh={handleRefresh} onError={handleError} />
       )}
       {tab === "eb_stops" && (
-        <EbAndStopsTab plans={plans} stops={stops} settings={settings} onRefresh={handleRefresh} onError={setError} />
+        <EbAndStopsTab plans={plans} stops={stops} settings={settings} onRefresh={handleRefresh} onError={handleError} />
       )}
       {tab === "team" && (
-        <TeamUnitTab settings={settings} users={users} onRefresh={handleRefresh} onError={setError} />
+        <TeamUnitTab settings={settings} users={users} onRefresh={handleRefresh} onError={handleError} />
       )}
     </div>
   );

@@ -12,6 +12,8 @@ import {
 import { ConfirmVoidModal } from "../components/ConfirmVoidModal";
 import { PageGuideBanner } from "../components/PageGuideBanner";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
+import { useLiveRefresh } from "../hooks/useLiveRefresh";
 import {
   Beam,
   DeliveryRecord,
@@ -44,6 +46,7 @@ function suggestNextChallanNo(existing: DeliveryRecord[]): string {
 
 export function DeliveriesPage() {
   const { tr } = useAuth();
+  const toast = useToast();
   const [tab, setTab] = useState<TabId>("deliveries");
   const [traders, setTraders] = useState<Trader[]>([]);
   const [sorts, setSorts] = useState<FabricSort[]>([]);
@@ -133,6 +136,8 @@ export function DeliveriesPage() {
     void loadAll();
   }, [loadAll]);
 
+  useLiveRefresh(loadAll);
+
   const selectedSort = sorts.find((s) => s.id === delSortId);
   const appliedPaisePreview = Math.round((parseFloat(delRateRs || "0") || 0) * 100);
   const hasInlineRateCut = selectedSort ? appliedPaisePreview > 0 && appliedPaisePreview < selectedSort.agreed_rate_paise : false;
@@ -141,7 +146,9 @@ export function DeliveriesPage() {
     e.preventDefault();
     if (submitting) return;
     if (!Number.isFinite(appliedPaisePreview) || appliedPaisePreview <= 0) {
-      setError(tr("Enter a valid rate per metre.", "சரியான மீட்டர் விகிதத்தை உள்ளிடவும்."));
+      const msg = tr("Enter a valid rate per metre.", "சரியான மீட்டர் விகிதத்தை உள்ளிடவும்.");
+      setError(msg);
+      toast.error(msg);
       return;
     }
     setSubmitting(true);
@@ -165,18 +172,21 @@ export function DeliveriesPage() {
           ],
         }),
       });
-      setSuccess(
-        res.has_rate_cut
-          ? tr(
-              `Challan saved — RATE CUT DETECTED: shortfall ${formatRupeesFromPaise(res.total_underpayment_paise)}!`,
-              `சலான் சேமிக்கப்பட்டது — விலை குறைப்பு கண்டறியப்பட்டது: ${formatRupeesFromPaise(res.total_underpayment_paise)}!`
-            )
-          : tr("Delivery challan saved.", "டெலிவரி சலான் சேமிக்கப்பட்டது.")
-      );
+      const msg = res.has_rate_cut
+        ? tr(
+            `Challan saved — RATE CUT DETECTED: shortfall ${formatRupeesFromPaise(res.total_underpayment_paise)}!`,
+            `சலான் சேமிக்கப்பட்டது — விலை குறைப்பு கண்டறியப்பட்டது: ${formatRupeesFromPaise(res.total_underpayment_paise)}!`
+          )
+        : tr("Delivery challan saved.", "டெலிவரி சலான் சேமிக்கப்பட்டது.");
+      setSuccess(msg);
+      toast.success(msg);
+      setShowDeliveryForm(false);
       setChallanNo(suggestNextChallanNo([res, ...deliveries]));
       await loadAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : tr("Failed to create delivery", "டெலிவரியை சேமிக்க முடியவில்லை"));
+      const msg = err instanceof Error ? err.message : tr("Failed to create delivery", "டெலிவரியை சேமிக்க முடியவில்லை");
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
@@ -188,7 +198,9 @@ export function DeliveriesPage() {
     const amtNum = parseFloat(payAmtRs);
     const shortNum = parseFloat(payShortRs || "0");
     if (!Number.isFinite(amtNum) || amtNum <= 0) {
-      setError(tr("Enter a valid payment amount.", "சரியான தொகையை உள்ளிடவும்."));
+      const msg = tr("Enter a valid payment amount.", "சரியான தொகையை உள்ளிடவும்.");
+      setError(msg);
+      toast.error(msg);
       return;
     }
     setSubmitting(true);
@@ -206,10 +218,15 @@ export function DeliveriesPage() {
       });
       setPayAmtRs("");
       setPayRef("");
-      setSuccess(tr("Trader payment recorded.", "வியாபாரி பணம் பதிவு செய்யப்பட்டது."));
+      setShowPaymentForm(false);
+      const msg = tr("Trader payment recorded.", "வியாபாரி பணம் பதிவு செய்யப்பட்டது.");
+      setSuccess(msg);
+      toast.success(msg);
       await loadAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : tr("Failed to save payment", "பணத்தை சேமிக்க முடியவில்லை"));
+      const msg = err instanceof Error ? err.message : tr("Failed to save payment", "பணத்தை சேமிக்க முடியவில்லை");
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
@@ -220,7 +237,9 @@ export function DeliveriesPage() {
     if (submitting) return;
     const expNum = parseFloat(expAmtRs);
     if (!Number.isFinite(expNum) || expNum <= 0) {
-      setError(tr("Enter a valid expense amount.", "சரியான செலவு தொகையை உள்ளிடவும்."));
+      const msg = tr("Enter a valid expense amount.", "சரியான செலவு தொகையை உள்ளிடவும்.");
+      setError(msg);
+      toast.error(msg);
       return;
     }
     setSubmitting(true);
@@ -237,10 +256,15 @@ export function DeliveriesPage() {
       });
       setExpAmtRs("");
       setExpNote("");
-      setSuccess(tr("Expense saved.", "செலவு சேமிக்கப்பட்டது."));
+      setShowExpenseForm(false);
+      const msg = tr("Expense saved.", "செலவு சேமிக்கப்பட்டது.");
+      setSuccess(msg);
+      toast.success(msg);
       await loadAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : tr("Failed to save expense", "செலவை சேமிக்க முடியவில்லை"));
+      const msg = err instanceof Error ? err.message : tr("Failed to save expense", "செலவை சேமிக்க முடியவில்லை");
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
@@ -257,10 +281,14 @@ export function DeliveriesPage() {
         body: JSON.stringify({ reading_date: readDate, kwh_total: readKwh }),
       });
       setReadKwh("");
-      setSuccess(tr("EB meter snapshot saved.", "EB மீட்டர் அளவு சேமிக்கப்பட்டது."));
+      const msg = tr("EB meter snapshot saved.", "EB மீட்டர் அளவு சேமிக்கப்பட்டது.");
+      setSuccess(msg);
+      toast.success(msg);
       await loadAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : tr("Failed to save EB reading", "EB அளவை சேமிக்க முடியவில்லை"));
+      const msg = err instanceof Error ? err.message : tr("Failed to save EB reading", "EB அளவை சேமிக்க முடியவில்லை");
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
@@ -271,7 +299,9 @@ export function DeliveriesPage() {
     if (submitting) return;
     const netNum = parseFloat(billNetRs);
     if (!Number.isFinite(netNum) || netNum < 0) {
-      setError(tr("Enter a valid net EB bill amount.", "சரியான EB பில் தொகையை உள்ளிடவும்."));
+      const msg = tr("Enter a valid net EB bill amount.", "சரியான EB பில் தொகையை உள்ளிடவும்.");
+      setError(msg);
+      toast.error(msg);
       return;
     }
     setSubmitting(true);
@@ -289,10 +319,14 @@ export function DeliveriesPage() {
       });
       setBillUnits("");
       setBillNetRs("");
-      setSuccess(tr("EB bill saved and slab components reconciled.", "EB பில் சேமிக்கப்பட்டது."));
+      const msg = tr("EB bill saved.", "EB பில் சேமிக்கப்பட்டது.");
+      setSuccess(msg);
+      toast.success(msg);
       await loadAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : tr("Failed to save EB bill", "EB பில்லை சேமிக்க முடியவில்லை"));
+      const msg = err instanceof Error ? err.message : tr("Failed to save EB bill", "EB பில்லை சேமிக்க முடியவில்லை");
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
@@ -304,10 +338,14 @@ export function DeliveriesPage() {
       const fd = new FormData();
       fd.append("file", file);
       await apiRequest(`/imports/${kind}`, { method: "POST", body: fd });
-      setSuccess(`Imported ${file.name} successfully.`);
+      const msg = `Imported ${file.name} successfully.`;
+      setSuccess(msg);
+      toast.success(msg);
       await loadAll();
     } catch (err) {
-      setError(err instanceof Error ? err.message : `Failed to import ${file.name}`);
+      const msg = err instanceof Error ? err.message : `Failed to import ${file.name}`;
+      setError(msg);
+      toast.error(msg);
     }
   };
 
@@ -322,11 +360,15 @@ export function DeliveriesPage() {
       await apiRequest(voidTarget.endpoint, { method: "DELETE", body: JSON.stringify({ reason }) });
       const label = voidTarget.label;
       setVoidTarget(null);
-      setSuccess(`Voided ${label} safely.`);
+      const msg = tr(`Voided ${label}.`, `${label} நீக்கப்பட்டது.`);
+      setSuccess(msg);
+      toast.success(msg);
       await loadAll();
     } catch (err) {
       setVoidTarget(null);
-      setError(err instanceof Error ? err.message : `Failed to void ${voidTarget.label}`);
+      const msg = err instanceof Error ? err.message : `Failed to void ${voidTarget.label}`;
+      setError(msg);
+      toast.error(msg);
     }
   };
 
@@ -363,20 +405,22 @@ export function DeliveriesPage() {
         )}
       />
 
-      <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-2">
+      <div className="flex flex-wrap items-center gap-1 border-b border-slate-200">
         {[
-          { id: "deliveries", label: tr(`Deliveries & Rate Check (${deliveries.length})`, `டெலிவரி & விலை சரிபார்ப்பு (${deliveries.length})`) },
-          { id: "payments", label: tr("Trader Receivables & Payments", "வியாபாரி பாக்கி & வரவு") },
+          { id: "deliveries", label: tr(`Deliveries (${deliveries.length})`, `டெலிவரி (${deliveries.length})`) },
+          { id: "payments", label: tr("Trader Payments", "வியாபாரி வரவு") },
           { id: "expenses", label: tr(`Expenses (${expenses.length})`, `செலவுகள் (${expenses.length})`) },
-          { id: "eb", label: tr(`EB Readings & Bills (${ebBills.length})`, `EB ரீடிங் & பில்கள் (${ebBills.length})`) },
-          { id: "exports", label: tr("CSV Exports & DB Backup", "CSV & பேக்கப்") },
+          { id: "eb", label: tr(`EB Readings & Bills (${ebBills.length})`, `EB பில்கள் (${ebBills.length})`) },
+          { id: "exports", label: tr("Exports & Backup", "CSV & பேக்கப்") },
         ].map((item) => (
           <button
             key={item.id}
             type="button"
             onClick={() => setTab(item.id as TabId)}
-            className={`px-3 py-2 rounded-lg text-xs font-semibold ${
-              tab === item.id ? "bg-slate-900 text-white" : "bg-white border border-slate-200 text-slate-700"
+            className={`px-3.5 py-2.5 text-xs font-semibold border-b-2 -mb-px transition cursor-pointer ${
+              tab === item.id
+                ? "border-slate-900 text-slate-900"
+                : "border-transparent text-slate-500 hover:text-slate-800"
             }`}
           >
             {item.label}

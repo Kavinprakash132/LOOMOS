@@ -4,10 +4,13 @@ import { Activity, AlertTriangle, BarChart3, Camera, CheckCircle2, ClipboardChec
 import { apiRequest, formatDateDMY, formatHoursFromMins, formatRupeesFromPaise, localIsoDate, offsetLocalIsoDate } from "../api/client";
 import { PageGuideBanner } from "../components/PageGuideBanner";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
+import { useLiveRefresh } from "../hooks/useLiveRefresh";
 import { FloorDashboard, OwnerDashboard } from "../types/api";
 
 export function DashboardPage() {
   const { user, tr } = useAuth();
+  const toast = useToast();
   const isOwner = user?.role === "OWNER";
 
   const [rangeMode, setRangeMode] = useState<"weekly" | "monthly" | "custom">("weekly");
@@ -33,12 +36,19 @@ export function DashboardPage() {
     void loadDashboard();
   }, [loadDashboard]);
 
+  useLiveRefresh(loadDashboard);
+
   const dismissAlert = async (id: number) => {
-    await apiRequest(`/alerts/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify({ status: "DISMISSED" }),
-    });
-    await loadDashboard();
+    try {
+      await apiRequest(`/alerts/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: "DISMISSED" }),
+      });
+      toast.success(tr("Alert dismissed.", "எச்சரிக்கை நீக்கப்பட்டது."));
+      await loadDashboard();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : tr("Could not dismiss alert", "எச்சரிக்கையை நீக்க முடியவில்லை"));
+    }
   };
 
   const selectPresetRange = (mode: "weekly" | "monthly") => {

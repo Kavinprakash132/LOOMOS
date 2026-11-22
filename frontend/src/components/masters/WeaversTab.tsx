@@ -1,7 +1,9 @@
 import React, { useState } from "react";
+import { Plus, X } from "lucide-react";
 import { apiRequest, formatDateDMY, formatRupeesFromPaise, localIsoDate } from "../../api/client";
 import { ConfirmVoidModal } from "../ConfirmVoidModal";
 import { useAuth } from "../../context/AuthContext";
+import { useToast } from "../../context/ToastContext";
 import { SlipLangCode, WageMode, Weaver, WeaverRoleType } from "../../types/api";
 
 export function WeaversTab({
@@ -14,6 +16,8 @@ export function WeaversTab({
   onError: (msg: string) => void;
 }) {
   const { t, tr } = useAuth();
+  const toast = useToast();
+  const [showAdd, setShowAdd] = useState(false);
   const roleLabel = (role: WeaverRoleType) => {
     if (role === "WEAVER") return tr("Weaver", "நெசவாளர்");
     if (role === "PIRN_WINDER") return tr("Pirn Winder", "கோன் சுற்றுபவர்");
@@ -55,8 +59,11 @@ export function WeaversTab({
           effective_from: effDate,
         }),
       });
+      const addedName = fullName.trim();
       setFullName("");
       setPhone("");
+      setShowAdd(false);
+      toast.success(tr(`Worker ${addedName} added.`, `தொழிலாளர் ${addedName} சேர்க்கப்பட்டார்.`));
       await onRefresh();
     } catch (err) {
       onError(err instanceof Error ? err.message : tr("Failed to create worker", "தொழிலாளியை சேர்க்க முடியவில்லை"));
@@ -80,6 +87,7 @@ export function WeaversTab({
         }),
       });
       setReviseTarget(null);
+      toast.success(tr("Wage rule updated.", "கூலி விதி புதுப்பிக்கப்பட்டது."));
       await onRefresh();
     } catch (err) {
       onError(err instanceof Error ? err.message : "Failed to update wage rule");
@@ -94,6 +102,7 @@ export function WeaversTab({
         body: JSON.stringify({ reason }),
       });
       setVoidRuleId(null);
+      toast.success(tr("Wage rule removed.", "கூலி விதி நீக்கப்பட்டது."));
       await onRefresh();
     } catch (err) {
       setVoidRuleId(null);
@@ -115,7 +124,24 @@ export function WeaversTab({
         onConfirm={confirmRemoveRule}
       />
 
-      <form onSubmit={handleCreate} className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="text-xs text-slate-500">
+          {tr(`${weavers.length} workers configured`, `${weavers.length} தொழிலாளர்கள்`)}
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowAdd((v) => !v)}
+          className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-bold transition cursor-pointer ${
+            showAdd ? "bg-slate-200 text-slate-800 hover:bg-slate-300" : "bg-slate-900 text-white hover:bg-slate-800"
+          }`}
+        >
+          {showAdd ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+          {showAdd ? tr("Close", "மூடு") : tr("Add Worker", "தொழிலாளர் சேர்")}
+        </button>
+      </div>
+
+      {showAdd && (
+      <form onSubmit={handleCreate} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
         <h3 className="text-sm font-bold">{tr("Add Worker (Weaver / Pirn Winder / Helper)", "தொழிலாளர் சேர் (நெசவாளர் / உதவியாளர்)")}</h3>
         <div className="grid sm:grid-cols-3 gap-2.5">
           <div>
@@ -203,10 +229,11 @@ export function WeaversTab({
             />
           </div>
         </div>
-        <button type="submit" className="px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold">
+        <button type="submit" className="px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold cursor-pointer">
           {tr("Add Worker", "தொழிலாளர் சேர்")}
         </button>
       </form>
+      )}
 
       <div className="space-y-2.5">
         {weavers.map((w) => (

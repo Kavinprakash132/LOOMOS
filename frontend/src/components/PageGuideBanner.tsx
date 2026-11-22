@@ -14,16 +14,18 @@ export function PageGuideBanner({
   const { tr } = useAuth();
   const [hidden, setHidden] = useState<boolean>(() => {
     try {
-      return localStorage.getItem(STORAGE_KEY) === "1";
+      const val = localStorage.getItem(STORAGE_KEY);
+      return val === null ? true : val === "1";
     } catch {
-      return false;
+      return true;
     }
   });
 
   useEffect(() => {
     const onSync = () => {
       try {
-        setHidden(localStorage.getItem(STORAGE_KEY) === "1");
+        const val = localStorage.getItem(STORAGE_KEY);
+        setHidden(val === null ? true : val === "1");
       } catch {
         // ignore storage errors
       }

@@ -139,3 +139,66 @@ def test_stop_reasons_include_power_cut_and_shift_client_uuid_uniqueness(
             db.rollback()
     finally:
         db.close()
+
+
+def test_loom_cloth_width_and_pick_create_bulk_and_update(client: TestClient, initialized_owner) -> None:
+    owner_headers, _ = initialized_owner
+
+    # 1. Create single loom with cloth_width_in and default_pick
+    r = client.post(
+        "/api/v1/looms",
+        headers=owner_headers,
+        json={
+            "loom_number": "S-99",
+            "loom_type": "SHUTTLE",
+            "rated_rpm": 165,
+            "reed_space_in": 56,
+            "cloth_width_in": "52.50",
+            "default_pick": 64,
+        },
+    )
+    assert r.status_code == 201, r.text
+    created = r.json()
+    assert created["loom_number"] == "S-99"
+    assert Decimal(str(created["cloth_width_in"])) == Decimal("52.50")
+    assert created["default_pick"] == 64
+
+    # 2. Bulk create looms with cloth_width_in and default_pick
+    b = client.post(
+        "/api/v1/looms/bulk",
+        headers=owner_headers,
+        json={
+            "count": 2,
+            "prefix": "AJ-",
+            "start_number": 1,
+            "loom_type": "RAPIER",
+            "rated_rpm": 320,
+            "reed_space_in": 75,
+            "cloth_width_in": "68.00",
+            "default_pick": 72,
+        },
+    )
+    assert b.status_code == 201, b.text
+    bulk_looms = b.json()
+    assert len(bulk_looms) == 2
+    assert all(Decimal(str(x["cloth_width_in"])) == Decimal("68.00") and x["default_pick"] == 72 for x in bulk_looms)
+
+    # 3. Update cloth_width_in and default_pick via PATCH and confirm persistence + audit log
+    u = client.patch(
+        f"/api/v1/looms/{created['id']}",
+        headers=owner_headers,
+        json={"cloth_width_in": "50.00", "default_pick": 68},
+    )
+    assert u.status_code == 200, u.text
+    updated = u.json()
+    assert Decimal(str(updated["cloth_width_in"])) == Decimal("50.00")
+    assert updated["default_pick"] == 68
+
+    logs = client.get("/api/v1/audit-logs?entity_type=loom", headers=owner_headers).json()
+    assert any(
+        entry["entity_id"] == created["id"]
+        and entry["action"] == "UPDATE"
+        and "cloth_width_in" in (entry.get("new_values_json") or "")
+        and "default_pick" in (entry.get("new_values_json") or "")
+        for entry in logs
+    )

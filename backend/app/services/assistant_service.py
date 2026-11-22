@@ -355,6 +355,8 @@ def _tool_list_looms(db: Session, args: dict[str, Any]) -> dict[str, Any]:
                 "make_model": l.make_model,
                 "rated_rpm": l.rated_rpm,
                 "reed_space_in": l.reed_space_in,
+                "cloth_width_in": l.cloth_width_in,
+                "default_pick": l.default_pick,
                 "status": l.status,
                 "is_active": l.is_active,
                 "active_beam_no": b["beam_no"] if b else None,
@@ -734,6 +736,12 @@ def _propose_action(
                 return {"error": f"Invalid loom_type '{loom_type}'. Choose SHUTTLE, RAPIER, AIRJET, WATERJET, or PROJECTILE."}
             rated_rpm = max(40, min(2500, int(args.get("rated_rpm") or 160)))
             reed_space_in = max(20, min(220, int(args.get("reed_space_in") or 56)))
+            cloth_width_in = (
+                str(Decimal(str(args["cloth_width_in"])).quantize(Decimal("0.01")))
+                if args.get("cloth_width_in") is not None
+                else None
+            )
+            default_pick = max(1, min(500, int(args["default_pick"]))) if args.get("default_pick") is not None else None
             make_model = str(args.get("make_model") or "").strip()[:80]
             existing_nums = set(db.scalars(select(Loom.loom_number)).all())
             start_num = args.get("start_number")
@@ -751,6 +759,11 @@ def _propose_action(
             conflicts = [n for n in planned if n in existing_nums]
             if conflicts:
                 return {"error": f"Loom numbers already exist: {', '.join(conflicts)}. Specify a different prefix or start_number."}
+            spec_bits = [f"Type: {loom_type}", f"RPM: {rated_rpm}", f"Reed: {reed_space_in}\""]
+            if cloth_width_in:
+                spec_bits.append(f"Cloth: {cloth_width_in}\"")
+            if default_pick:
+                spec_bits.append(f"Pick: {default_pick}")
             card = create_action_token(
                 user_id=owner.id,
                 action_type="add_looms",
@@ -758,7 +771,7 @@ def _propose_action(
                 summary=f"Create {', '.join(planned[:5])}{'...' if len(planned) > 5 else ''} ({rated_rpm} RPM, {reed_space_in}\" reed)",
                 details=[
                     f"Loom Numbers: {', '.join(planned)}",
-                    f"Type: {loom_type} · RPM: {rated_rpm} · Reed: {reed_space_in}\"",
+                    " · ".join(spec_bits),
                     *( [f"Make/Model: {make_model}"] if make_model else [] ),
                 ],
                 payload={
@@ -769,6 +782,8 @@ def _propose_action(
                     "make_model": make_model,
                     "rated_rpm": rated_rpm,
                     "reed_space_in": reed_space_in,
+                    "cloth_width_in": cloth_width_in,
+                    "default_pick": default_pick,
                 },
             )
             pending_actions.append(card)
@@ -790,6 +805,18 @@ def _propose_action(
                 rpm = max(40, min(2500, int(args["rated_rpm"])))
                 updates["rated_rpm"] = rpm
                 details.append(f"Rated RPM: {loom_obj.rated_rpm} -> {rpm}")
+            if args.get("reed_space_in") is not None:
+                rs = max(20, min(220, int(args["reed_space_in"])))
+                updates["reed_space_in"] = rs
+                details.append(f"Reed Space: {loom_obj.reed_space_in}\" -> {rs}\"")
+            if args.get("cloth_width_in") is not None:
+                cw = str(Decimal(str(args["cloth_width_in"])).quantize(Decimal("0.01")))
+                updates["cloth_width_in"] = cw
+                details.append(f"Cloth Width: {loom_obj.cloth_width_in or '-'} -> {cw}\"")
+            if args.get("default_pick") is not None:
+                dp = max(1, min(500, int(args["default_pick"])))
+                updates["default_pick"] = dp
+                details.append(f"Pick: {loom_obj.default_pick or '-'} -> {dp}")
             if args.get("make_model") is not None:
                 updates["make_model"] = str(args["make_model"]).strip()[:80]
                 details.append(f"Make/Model: {updates['make_model']}")
@@ -1227,6 +1254,8 @@ def execute_signed_action(db: Session, owner: User, action_token: str) -> dict[s
                 make_model=p.get("make_model", ""),
                 rated_rpm=int(p["rated_rpm"]),
                 reed_space_in=int(p["reed_space_in"]),
+                cloth_width_in=Decimal(str(p["cloth_width_in"])) if p.get("cloth_width_in") is not None else None,
+                default_pick=int(p["default_pick"]) if p.get("default_pick") is not None else None,
                 status="OPERATIONAL",
                 created_by=owner.id,
             )
@@ -1250,10 +1279,12 @@ def execute_signed_action(db: Session, owner: User, action_token: str) -> dict[s
         loom = db.get(Loom, int(p["loom_id"]))
         if not loom:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Loom not found")
-        fields = ["loom_number", "loom_type", "make_model", "rated_rpm", "reed_space_in", "status", "is_active"]
+        fields = ["loom_number", "loom_type", "make_model", "rated_rpm", "reed_space_in", "cloth_width_in", "default_pick", "status", "is_active"]
         old = snapshot_fields(loom, fields)
         for k, v in p["updates"].items():
-            if k in fields:
+            if k == "cloth_width_in" and v is not None:
+                loom.cloth_width_in = Decimal(str(v))
+            elif k in fields:
                 setattr(loom, k, v)
         record_audit(
             db,
@@ -1731,19 +1762,24 @@ def _build_tool_declarations(types_mod: Any) -> list[Any]:
                     "make_model": S(type=T.STRING),
                     "rated_rpm": S(type=T.INTEGER, description="Rated RPM (default 160)."),
                     "reed_space_in": S(type=T.INTEGER, description="Reed space inches (default 56)."),
+                    "cloth_width_in": S(type=T.NUMBER, description="Cloth width in inches (optional, e.g. 52)."),
+                    "default_pick": S(type=T.INTEGER, description="Default pick / PPI (optional, e.g. 60)."),
                 },
                 required=["count"],
             ),
         ),
         FD(
             name="propose_update_loom",
-            description="Propose updating an existing loom's status (OPERATIONAL / UNDER_MAINTENANCE / IDLE), RPM, model, or active flag.",
+            description="Propose updating an existing loom's status, RPM, reed space, cloth width (inches), pick (PPI), model, or active flag.",
             parameters=S(
                 type=T.OBJECT,
                 properties={
                     "loom_number": S(type=T.STRING, description="Loom number, e.g. L-03."),
                     "status": S(type=T.STRING, description="OPERATIONAL, UNDER_MAINTENANCE, or IDLE."),
                     "rated_rpm": S(type=T.INTEGER),
+                    "reed_space_in": S(type=T.INTEGER),
+                    "cloth_width_in": S(type=T.NUMBER),
+                    "default_pick": S(type=T.INTEGER),
                     "make_model": S(type=T.STRING),
                     "is_active": S(type=T.BOOLEAN),
                 },

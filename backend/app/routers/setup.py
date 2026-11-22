@@ -141,6 +141,8 @@ def initialize_shed(
                     make_model=group.make_model.strip(),
                     rated_rpm=group.rated_rpm,
                     reed_space_in=group.reed_space_in,
+                    cloth_width_in=group.cloth_width_in,
+                    default_pick=group.default_pick,
                     status="OPERATIONAL",
                     is_active=True,
                     created_by=owner.id,

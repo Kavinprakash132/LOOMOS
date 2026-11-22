@@ -1,7 +1,9 @@
 import React, { useState } from "react";
+import { Plus, X } from "lucide-react";
 import { apiRequest, formatRupeesFromPaise, localIsoDate } from "../../api/client";
 import { ConfirmVoidModal } from "../ConfirmVoidModal";
 import { useAuth } from "../../context/AuthContext";
+import { useToast } from "../../context/ToastContext";
 import { EbTariffPlan, StopReason, UnitSettings } from "../../types/api";
 
 export function EbAndStopsTab({
@@ -18,6 +20,9 @@ export function EbAndStopsTab({
   onError: (msg: string) => void;
 }) {
   const { tr } = useAuth();
+  const toast = useToast();
+  const [showAddPlan, setShowAddPlan] = useState(false);
+  const [showAddStop, setShowAddStop] = useState(false);
   const [planName, setPlanName] = useState("");
   const [cycleDays, setCycleDays] = useState(60);
   const [effDate, setEffDate] = useState(localIsoDate());
@@ -67,7 +72,10 @@ export function EbAndStopsTab({
           slabs,
         }),
       });
+      const addedPlan = planName.trim();
       setPlanName("");
+      setShowAddPlan(false);
+      toast.success(tr(`Tariff plan ${addedPlan} added.`, `கட்டணத் திட்டம் ${addedPlan} சேர்க்கப்பட்டது.`));
       await onRefresh();
     } catch (err) {
       onError(err instanceof Error ? err.message : "Invalid tariff slab format");
@@ -77,6 +85,7 @@ export function EbAndStopsTab({
   const activatePlan = async (planId: number) => {
     try {
       await apiRequest("/settings", { method: "PATCH", body: JSON.stringify({ active_tariff_plan_id: planId }) });
+      toast.success(tr("Active EB tariff plan updated.", "செயலில் உள்ள EB திட்டம் மாற்றப்பட்டது."));
       await onRefresh();
     } catch (err) {
       onError(err instanceof Error ? err.message : "Failed to activate plan");
@@ -88,6 +97,7 @@ export function EbAndStopsTab({
     try {
       await apiRequest(`/eb-tariffs/${voidPlanId}`, { method: "DELETE", body: JSON.stringify({ reason }) });
       setVoidPlanId(null);
+      toast.success(tr("Tariff plan removed.", "கட்டணத் திட்டம் நீக்கப்பட்டது."));
       await onRefresh();
     } catch (err) {
       setVoidPlanId(null);
@@ -107,10 +117,13 @@ export function EbAndStopsTab({
           is_power_cut: isPowerCut,
         }),
       });
+      const addedLabel = stopEn.trim();
       setStopCode("");
       setStopEn("");
       setStopTa("");
       setIsPowerCut(false);
+      setShowAddStop(false);
+      toast.success(tr(`Stop reason ${addedLabel} added.`, `நிறுத்தக் காரணம் ${addedLabel} சேர்க்கப்பட்டது.`));
       await onRefresh();
     } catch (err) {
       onError(err instanceof Error ? err.message : "Failed to add stop reason");
@@ -132,8 +145,24 @@ export function EbAndStopsTab({
       />
 
       <div className="space-y-3">
-        <form onSubmit={createPlan} className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
-          <h3 className="text-sm font-bold">{tr("EB Tariff Plans (TANGEDCO / Custom Slab Rates)", "EB கட்டணத் திட்டங்கள் (TNPDCL / அடுக்கு கட்டணம்)")}</h3>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-bold text-slate-900">
+            {tr(`EB Tariff Plans (${plans.length})`, `EB கட்டணத் திட்டங்கள் (${plans.length})`)}
+          </h3>
+          <button
+            type="button"
+            onClick={() => setShowAddPlan((v) => !v)}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+              showAddPlan ? "bg-slate-200 text-slate-800" : "bg-slate-900 text-white hover:bg-slate-800"
+            }`}
+          >
+            {showAddPlan ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+            {showAddPlan ? tr("Close", "மூடு") : tr("Add Tariff Plan", "திட்டம் சேர்")}
+          </button>
+        </div>
+
+        {showAddPlan && (
+        <form onSubmit={createPlan} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
           <div className="grid sm:grid-cols-3 gap-2">
             <div>
               <label className="block text-[11px] font-semibold text-slate-600 mb-1">
@@ -211,10 +240,11 @@ export function EbAndStopsTab({
               placeholder="0-1000:0.00, 1001-1500:4.15, 1501+:5.30"
             />
           </div>
-          <button type="submit" className="px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold">
-            {tr("Add Tariff Plan", "திட்டம் சேர்")}
+          <button type="submit" className="px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold cursor-pointer">
+            {tr("Save Tariff Plan", "திட்டம் சேமி")}
           </button>
         </form>
+        )}
 
         <div className="space-y-2">
           {plans.map((p) => {
@@ -261,8 +291,24 @@ export function EbAndStopsTab({
 
       {/* Stop Reasons */}
       <div className="space-y-3">
-        <form onSubmit={addStopReason} className="bg-white p-4 rounded-xl border border-slate-200 space-y-3">
-          <h3 className="text-sm font-bold">{tr("Stoppage Reasons (Optional Reference Categories)", "நிறுத்தக் காரணங்கள் (விருப்ப வகைகள்)")}</h3>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-sm font-bold text-slate-900">
+            {tr(`Stoppage Reasons (${stops.length})`, `நிறுத்தக் காரணங்கள் (${stops.length})`)}
+          </h3>
+          <button
+            type="button"
+            onClick={() => setShowAddStop((v) => !v)}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+              showAddStop ? "bg-slate-200 text-slate-800" : "bg-slate-900 text-white hover:bg-slate-800"
+            }`}
+          >
+            {showAddStop ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+            {showAddStop ? tr("Close", "மூடு") : tr("Add Stop Reason", "காரணம் சேர்")}
+          </button>
+        </div>
+
+        {showAddStop && (
+        <form onSubmit={addStopReason} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
           <div className="grid sm:grid-cols-3 gap-2">
             <div>
               <label className="block text-[11px] font-semibold text-slate-600 mb-1">{tr("Short Code *", "குறியீடு *")}</label>
@@ -300,11 +346,12 @@ export function EbAndStopsTab({
             {tr("Count duration as Power Cut (adjusts EB analysis)", "மின்வெட்டு நேரமாக கணக்கிடு (EB பகுப்பாய்வில்)")}
           </label>
           <div>
-            <button type="submit" className="px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold">
-              {tr("Add Stop Reason", "காரணம் சேர்")}
+            <button type="submit" className="px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold cursor-pointer">
+              {tr("Save Stop Reason", "காரணம் சேமி")}
             </button>
           </div>
         </form>
+        )}
 
         <div className="bg-white rounded-xl border border-slate-200 divide-y divide-slate-100">
           {stops.map((s) => (

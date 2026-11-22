@@ -4,10 +4,13 @@ import { apiRequest, formatDateDMY, localIsoDate } from "../api/client";
 import { ConfirmVoidModal } from "../components/ConfirmVoidModal";
 import { PageGuideBanner } from "../components/PageGuideBanner";
 import { useAuth } from "../context/AuthContext";
+import { useToast } from "../context/ToastContext";
+import { useLiveRefresh } from "../hooks/useLiveRefresh";
 import { Beam, FabricSort, Loom, Trader, UnloadReason, WeftReceipt } from "../types/api";
 
 export function BeamsPage() {
   const { tr } = useAuth();
+  const toast = useToast();
   const [beams, setBeams] = useState<Beam[]>([]);
   const [receipts, setReceipts] = useState<WeftReceipt[]>([]);
   const [traders, setTraders] = useState<Trader[]>([]);
@@ -78,6 +81,8 @@ export function BeamsPage() {
     void loadData();
   }, [loadData]);
 
+  useLiveRefresh(loadData);
+
   const busyLoomIds = new Set(beams.filter((b) => b.active_loom_id).map((b) => b.active_loom_id!));
   const freeLooms = looms.filter((l) => l.status === "OPERATIONAL" && !busyLoomIds.has(l.id));
 
@@ -101,12 +106,18 @@ export function BeamsPage() {
           due_date: dueDate || null,
         }),
       });
+      const addedNo = beamNo;
       setBeamNo("");
       setOpeningWoven("0");
-      setSuccess(tr("Warp beam added.", "பீம் சேர்க்கப்பட்டது."));
+      setOpenDrawer("none");
+      const msg = tr(`Warp beam ${addedNo} added.`, `பீம் ${addedNo} சேர்க்கப்பட்டது.`);
+      setSuccess(msg);
+      toast.success(msg);
       await loadData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : tr("Could not add beam", "பீமை சேர்க்க முடியவில்லை"));
+      const msg = err instanceof Error ? err.message : tr("Could not add beam", "பீமை சேர்க்க முடியவில்லை");
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
@@ -130,10 +141,15 @@ export function BeamsPage() {
         }),
       });
       setWeftNote("");
-      setSuccess(tr("Weft yarn receipt recorded and wastage rechecked.", "ஊடு நூல் வரவு சேமிக்கப்பட்டு கழிவு சரிபார்க்கப்பட்டது."));
+      setOpenDrawer("none");
+      const msg = tr("Weft yarn receipt saved.", "ஊடு நூல் வரவு சேமிக்கப்பட்டது.");
+      setSuccess(msg);
+      toast.success(msg);
       await loadData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : tr("Could not save weft receipt", "நூல் வரவை சேமிக்க முடியவில்லை"));
+      const msg = err instanceof Error ? err.message : tr("Could not save weft receipt", "நூல் வரவை சேமிக்க முடியவில்லை");
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
@@ -149,10 +165,14 @@ export function BeamsPage() {
         body: JSON.stringify({ loom_id: mountLoomId }),
       });
       setMountBeamId(null);
-      setSuccess(tr("Beam mounted on loom.", "தறியில் பீம் ஏற்றப்பட்டது."));
+      const msg = tr("Beam mounted on loom.", "தறியில் பீம் ஏற்றப்பட்டது.");
+      setSuccess(msg);
+      toast.success(msg);
       await loadData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : tr("Failed to mount beam", "பீம் ஏற்ற முடியவில்லை"));
+      const msg = err instanceof Error ? err.message : tr("Failed to mount beam", "பீம் ஏற்ற முடியவில்லை");
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
@@ -172,10 +192,14 @@ export function BeamsPage() {
         }),
       });
       setUnloadBeamId(null);
-      setSuccess(tr("Beam unloaded and weft wastage reconciled.", "பீம் இறக்கப்பட்டு நூல் கழிவு கணக்கிடப்பட்டது."));
+      const msg = tr("Beam unloaded and wastage reconciled.", "பீம் இறக்கப்பட்டு நூல் கழிவு கணக்கிடப்பட்டது.");
+      setSuccess(msg);
+      toast.success(msg);
       await loadData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : tr("Failed to unload beam", "பீம் இறக்க முடியவில்லை"));
+      const msg = err instanceof Error ? err.message : tr("Failed to unload beam", "பீம் இறக்க முடியவில்லை");
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
@@ -191,11 +215,15 @@ export function BeamsPage() {
       });
       const lbl = voidWeftTarget.label;
       setVoidWeftTarget(null);
-      setSuccess(`Voided ${lbl} cleanly.`);
+      const msg = tr(`Voided ${lbl}.`, `${lbl} நீக்கப்பட்டது.`);
+      setSuccess(msg);
+      toast.success(msg);
       await loadData();
     } catch (err) {
       setVoidWeftTarget(null);
-      setError(err instanceof Error ? err.message : "Failed to void weft receipt");
+      const msg = err instanceof Error ? err.message : "Failed to void weft receipt";
+      setError(msg);
+      toast.error(msg);
     }
   };
 
