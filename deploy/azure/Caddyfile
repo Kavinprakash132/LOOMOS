@@ -16,3 +16,11 @@
         header_up X-Real-IP {remote_host}
     }
 }
+
+www.loomos.tech {
+    redir https://loomos.tech{uri} permanent
+}
+
+loomos-kavin-241d.centralindia.cloudapp.azure.com {
+    redir https://loomos.tech{uri} permanent
+}
