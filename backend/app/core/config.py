@@ -63,7 +63,7 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     gemini_model: str = "gemini-3.5-flash-lite"
     gemini_pro_model: str = "gemini-3.5-flash"
-    gemini_fallback_models: str = "gemini-3.5-flash-lite,gemini-3.5-flash,gemini-3.6-flash,gemini-3.7-flash"
+    gemini_fallback_models: str = "gemini-3.5-flash-lite,gemini-3.1-flash-lite,gemini-3.5-flash,gemini-3.6-flash,gemini-3.7-flash"
     ai_allowed_usernames: str = ""
 
     def is_demo_active(self) -> bool:
@@ -91,14 +91,16 @@ class Settings(BaseSettings):
 
     def ai_model_chain(self, mode: str = "fast") -> list[str]:
         """Return ordered deduplicated Gemini model chain with automatic fallback."""
-        primary = self.gemini_pro_model.strip() if mode == "deep" else self.gemini_model.strip()
-        secondary = self.gemini_model.strip() if mode == "deep" else self.gemini_pro_model.strip()
         fallbacks = [m.strip() for m in self.gemini_fallback_models.split(",") if m.strip()]
+        if mode == "deep":
+            heads = [self.gemini_pro_model.strip(), self.gemini_model.strip()]
+        else:
+            heads = [self.gemini_model.strip(), "gemini-3.1-flash-lite", self.gemini_pro_model.strip()]
         ordered: list[str] = []
-        for m in [primary, secondary, *fallbacks]:
+        for m in [*heads, *fallbacks]:
             if m and m not in ordered:
                 ordered.append(m)
-        return ordered or ["gemini-3.5-flash", "gemini-3.5-flash-lite"]
+        return ordered or ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite"]
 
     def resolved_secret_key(self) -> str:
         """Return configured secret key or auto-generate a local persistent secret alongside the DB."""

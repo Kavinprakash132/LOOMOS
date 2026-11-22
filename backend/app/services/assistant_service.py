@@ -1950,8 +1950,9 @@ def _extract_visible_text(response: Any) -> str:
 
 def _build_genai_client(api_key: str) -> Any:
     from google import genai  # lazy import so tests without key stay fast
+    from google.genai import types
 
-    return genai.Client(api_key=api_key)
+    return genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=25_000))
 
 
 def _generate_with_fallback(
@@ -1973,7 +1974,10 @@ def _generate_with_fallback(
         except Exception as exc:
             last_exc = exc
             msg = str(exc).upper()
-            retryable = any(tok in msg for tok in ("429", "503", "500", "404", "UNAVAILABLE", "RESOURCE_EXHAUSTED", "NOT_FOUND", "OVERLOADED"))
+            retryable = any(
+                tok in msg
+                for tok in ("429", "503", "500", "404", "UNAVAILABLE", "RESOURCE_EXHAUSTED", "NOT_FOUND", "OVERLOADED", "TIMEOUT", "TIMED OUT")
+            )
             if not retryable:
                 raise
     raise HTTPException(
