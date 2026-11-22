@@ -107,7 +107,7 @@ def populate_demo_shed(db_path: Path) -> dict[str, str | int]:
 
     with SessionLocal() as db:
         owner = User(
-            full_name="Ramasamy K (Demo Owner)",
+            full_name="Kavin",
             username="welcome123",
             password_hash=hash_password("welcome123"),
             role="OWNER",

@@ -394,8 +394,8 @@ export default function AiCopilotDrawer() {
                     </div>
                     <p className="text-xs text-slate-600 leading-relaxed">
                       {tr(
-                        "Ask anything in English, Tanglish, or Tamil — check metres, wages, EB bills, beam ETAs, or snap a photo of a delivery challan / TNPDCL bill / cloth defect. Every write action shows a Confirm card first.",
-                        "தமிழ், Tanglish அல்லது ஆங்கிலத்தில் எதையும் கேளுங்கள் — மீட்டர், கூலி, EB பில், பீம் ETA பார்க்கலாம் அல்லது பில்/துணி புகைப்படம் அனுப்பி பதிவு செய்யலாம்."
+                        "Ask about production, wages, EB, or bills — or attach a photo to log or inspect.",
+                        "உற்பத்தி, கூலி, EB அல்லது பில் விவரங்களைக் கேளுங்கள் — புகைப்படம் இணைக்கலாம்."
                       )}
                     </p>
                   </div>
@@ -648,7 +648,7 @@ export default function AiCopilotDrawer() {
                       void sendMessage();
                     }
                   }}
-                  placeholder={tr("Ask anything in English, Tanglish, or தமிழ்...", "தமிழ் / English-ல் கேளுங்கள்...")}
+                  placeholder={tr("Ask LOOMOS AI...", "LOOMOS AI-யிடம் கேளுங்கள்...")}
                   className="flex-1 resize-none rounded-xl border border-slate-300 focus:border-amber-500 focus:outline-none px-3 py-2 text-sm max-h-28 bg-slate-50"
                 />
 
