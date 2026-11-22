@@ -1,5 +1,8 @@
 name: LOOMOS CI & Auto-Deploy to Azure
 
+permissions:
+  contents: read
+
 on:
   push:
     branches: [main]

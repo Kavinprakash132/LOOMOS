@@ -13,6 +13,8 @@ services:
       - LOOMOS_BACKUP_DIR=/data/backups
       - LOOMOS_DEMO_MODE=${LOOMOS_DEMO_MODE:-false}
       - LOOMOS_AUTO_SEED_DEMO=${LOOMOS_AUTO_SEED_DEMO:-false}
+      - LOOMOS_ENABLE_API_DOCS=${LOOMOS_ENABLE_API_DOCS:-false}
+      - LOOMOS_CORS_ORIGINS=${LOOMOS_CORS_ORIGINS:-["https://loomos-kavin-241d.centralindia.cloudapp.azure.com","https://loomos.tech","https://www.loomos.tech"]}
       - LOOMOS_GEMINI_API_KEY=${LOOMOS_GEMINI_API_KEY:-}
       - LOOMOS_GEMINI_MODEL=${LOOMOS_GEMINI_MODEL:-gemini-3.5-flash-lite}
       - LOOMOS_GEMINI_PRO_MODEL=${LOOMOS_GEMINI_PRO_MODEL:-gemini-3.5-flash}

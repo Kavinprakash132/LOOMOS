@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.audit import record_audit, snapshot_fields, soft_delete_record
-from app.core.config import today_ist
+from app.core.config import get_settings, today_ist
 from app.core.database import get_db
 from app.core.security import get_current_user, require_owner
 from app.models.core import AuditLog, BeamLoading, FabricSort, Inspection, Loom, ShiftEntry, Trader, User, WageRule, Weaver
@@ -571,7 +571,7 @@ def list_audit_logs(
     entity_type: str | None = None,
     action: str | None = None,
     limit: int = Query(default=100, ge=1, le=500),
-    _owner: Annotated[User, Depends(require_owner)] = None,  # type: ignore[assignment]
+    owner: Annotated[User, Depends(require_owner)] = None,  # type: ignore[assignment]
     db: Annotated[Session, Depends(get_db)] = None,  # type: ignore[assignment]
 ) -> list[AuditLogResponse]:
     stmt = select(AuditLog).order_by(AuditLog.id.desc()).limit(limit)
@@ -579,4 +579,23 @@ def list_audit_logs(
         stmt = stmt.where(AuditLog.entity_type == entity_type)
     if action:
         stmt = stmt.where(AuditLog.action == action)
-    return [AuditLogResponse.model_validate(x) for x in db.scalars(stmt).all()]
+    rows = db.scalars(stmt).all()
+    cfg = get_settings()
+    if cfg.is_ai_allowed_user(owner) or not cfg.ai_allowed_username_set():
+        return [AuditLogResponse.model_validate(x) for x in rows]
+
+    priv_usernames = cfg.ai_allowed_username_set()
+    priv_ids = {
+        u.id for u in db.scalars(select(User)).all() if u.username.strip().lower() in priv_usernames
+    }
+    out: list[AuditLogResponse] = []
+    for row in rows:
+        if row.entity_type == "user" and row.entity_id in priv_ids:
+            continue
+        item = AuditLogResponse.model_validate(row)
+        if item.changed_by in priv_ids:
+            item.changed_by = None
+        if item.reason and "AI Copilot" in item.reason:
+            item.reason = "Owner update"
+        out.append(item)
+    return out

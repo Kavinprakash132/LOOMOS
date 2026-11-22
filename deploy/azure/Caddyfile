@@ -1,14 +1,18 @@
 {$LOOMOS_DOMAIN::80} {
     encode gzip zstd
     header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
         X-Content-Type-Options "nosniff"
         X-Frame-Options "DENY"
         Referrer-Policy "strict-origin-when-cross-origin"
         Permissions-Policy "camera=(self), microphone=(), geolocation=()"
+        Cross-Origin-Opener-Policy "same-origin"
         -Server
     }
     request_body {
         max_size 20MB
     }
-    reverse_proxy loomos:8000
+    reverse_proxy loomos:8000 {
+        header_up X-Real-IP {remote_host}
+    }
 }

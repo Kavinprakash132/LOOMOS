@@ -24,6 +24,9 @@ def create_app() -> FastAPI:
         title="LOOMOS API",
         version="0.2.0",
         description="Mobile-first Powerloom Job-Work Production, Analytics & Defect Inspection System",
+        docs_url="/docs" if cfg.enable_api_docs else None,
+        redoc_url="/redoc" if cfg.enable_api_docs else None,
+        openapi_url="/openapi.json" if cfg.enable_api_docs else None,
     )
 
     app.add_middleware(
@@ -41,6 +44,13 @@ def create_app() -> FastAPI:
         response.headers.setdefault("X-Frame-Options", "DENY")
         response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
         response.headers.setdefault("Permissions-Policy", "camera=(self), microphone=(), geolocation=()")
+        response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
+        response.headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; "
+            "frame-ancestors 'none'; base-uri 'self'; form-action 'self'",
+        )
         path = request.url.path
         if path.startswith("/assets/"):
             response.headers.setdefault("Cache-Control", "public, max-age=31536000, immutable")

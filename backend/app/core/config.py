@@ -59,6 +59,8 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 720
     # Allow localhost and private LAN IP origins by default for Choice 1 (Wi-Fi/LAN)
     cors_origins: list[str] = ["*"]
+    enable_api_docs: bool = True
+    protected_demo_usernames: str = "welcome123,welcome@123"
     # Private In-App LOOMOS AI Copilot (Gemini) — strictly allowlisted usernames only
     gemini_api_key: str = ""
     gemini_model: str = "gemini-3.5-flash-lite"
@@ -69,6 +71,10 @@ class Settings(BaseSettings):
     def is_demo_active(self) -> bool:
         """Return True whenever running against the isolated demo database."""
         return bool(self.demo_mode or self.db_path.name.lower() == "loomos_demo.db")
+
+    def protected_demo_username_set(self) -> set[str]:
+        """Demo accounts whose passwords/active flags cannot be vandalized by public demo visitors."""
+        return {u.strip().lower() for u in self.protected_demo_usernames.split(",") if u.strip()}
 
     def ai_allowed_username_set(self) -> set[str]:
         """Return lowercase set of usernames explicitly granted private AI Copilot access."""

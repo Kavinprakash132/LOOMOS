@@ -75,7 +75,7 @@ def _csv_response(filename: str, headers: list[str], rows: list[list[object]]) -
 @router.get("/exports/csv/{entity}")
 def export_entity_csv(
     entity: str,
-    _owner: Annotated[User, Depends(require_owner)],
+    owner: Annotated[User, Depends(require_owner)],
     db: Annotated[Session, Depends(get_db)],
 ) -> Response:
     today_tag = today_ist().isoformat()
@@ -149,13 +149,26 @@ def export_entity_csv(
         )
     if entity == "audit_logs":
         items = db.scalars(select(AuditLog).order_by(AuditLog.changed_at.desc()).limit(2000)).all()
+        cfg = get_settings()
+        redact = not cfg.is_ai_allowed_user(owner) and bool(cfg.ai_allowed_username_set())
+        priv_ids = (
+            {u.id for u in db.scalars(select(User)).all() if u.username.strip().lower() in cfg.ai_allowed_username_set()}
+            if redact
+            else set()
+        )
+        rows_out = []
+        for x in items:
+            if redact and x.entity_type == "user" and x.entity_id in priv_ids:
+                continue
+            c_by = None if (redact and x.changed_by in priv_ids) else x.changed_by
+            reason = "Owner update" if (redact and x.reason and "AI Copilot" in x.reason) else (x.reason or "")
+            rows_out.append(
+                [x.id, x.entity_type, x.entity_id, x.action, c_by, x.changed_at.isoformat(), x.old_values_json or "", x.new_values_json or "", reason]
+            )
         return _csv_response(
             f"loomos_audit_logs_{today_tag}.csv",
             ["id", "entity_type", "entity_id", "action", "changed_by", "changed_at", "old_values_json", "new_values_json", "reason"],
-            [
-                [x.id, x.entity_type, x.entity_id, x.action, x.changed_by, x.changed_at.isoformat(), x.old_values_json or "", x.new_values_json or "", x.reason or ""]
-                for x in items
-            ],
+            rows_out,
         )
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Unsupported export entity: {entity}")
 
@@ -293,11 +306,47 @@ def download_sqlite_backup(
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
         tmp_path = Path(tmp.name)
 
+    cfg = get_settings()
+    scrub_private = not cfg.is_ai_allowed_user(owner) and bool(cfg.ai_allowed_username_set())
+
     try:
         src_conn = sqlite3.connect(str(db_file))
         dst_conn = sqlite3.connect(str(tmp_path))
         try:
             src_conn.backup(dst_conn)
+            if scrub_private:
+                priv_names = sorted(cfg.ai_allowed_username_set())
+                placeholders = ",".join("?" for _ in priv_names)
+                cur = dst_conn.cursor()
+                priv_ids = [
+                    r[0]
+                    for r in cur.execute(
+                        f"SELECT id FROM users WHERE lower(username) IN ({placeholders})", priv_names
+                    ).fetchall()
+                ]
+                if priv_ids:
+                    id_ph = ",".join("?" for _ in priv_ids)
+                    cur.execute("PRAGMA foreign_keys=OFF")
+                    # Nullify audit/created_by references before removing private users from the backup copy
+                    tables = [
+                        r[0]
+                        for r in cur.execute(
+                            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+                        ).fetchall()
+                    ]
+                    for tbl in tables:
+                        cols = {c[1] for c in cur.execute(f'PRAGMA table_info("{tbl}")').fetchall()}
+                        for col in ("created_by", "deleted_by", "changed_by"):
+                            if col in cols:
+                                cur.execute(f'UPDATE "{tbl}" SET "{col}" = NULL WHERE "{col}" IN ({id_ph})', priv_ids)
+                    cur.execute(f"DELETE FROM audit_logs WHERE entity_type='user' AND entity_id IN ({id_ph})", priv_ids)
+                    cur.execute(
+                        "UPDATE audit_logs SET reason='Owner update' WHERE reason LIKE '%AI Copilot%'"
+                    )
+                    cur.execute(f"DELETE FROM users WHERE id IN ({id_ph})", priv_ids)
+                    dst_conn.commit()
+                    # VACUUM rewrites all SQLite pages so scrubbed usernames/hashes cannot be recovered from free pages
+                    dst_conn.execute("VACUUM")
         finally:
             dst_conn.close()
             src_conn.close()

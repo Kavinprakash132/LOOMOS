@@ -186,6 +186,14 @@ def test_ai_copilot_tool_loop_and_confirm_execute_audit(
             assert ex.status_code == 200, ex.text
             assert ex.json()["status"] == "executed"
 
+        # Single-use replay protection: re-submitting an already executed action token MUST fail (409)
+        replay = client.post(
+            "/api/v1/assistant/execute",
+            headers=owner_headers,
+            json={"action_token": body["pending_actions"][0]["action_token"]},
+        )
+        assert replay.status_code == 409
+
         # Verify DB mutations & Audit Log entries
         advs = client.get("/api/v1/advances", headers=owner_headers).json()
         assert len(advs) == 1
@@ -199,5 +207,83 @@ def test_ai_copilot_tool_loop_and_confirm_execute_audit(
 
         logs = client.get("/api/v1/audit-logs?limit=20", headers=owner_headers).json()
         assert any(l.get("reason") == "Applied via LOOMOS AI Copilot" for l in logs)
+    finally:
+        get_settings.cache_clear()
+
+
+def test_redteam_backup_scrub_audit_redaction_xff_spoof_and_demo_lock(
+    client: TestClient,
+    initialized_owner,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import sqlite3
+    import tempfile
+    from pathlib import Path
+
+    owner_headers, _ = initialized_owner
+
+    # Create private AI owner + demo protected user before enabling allowlist
+    priv = client.post(
+        "/api/v1/auth/users",
+        headers=owner_headers,
+        json={"full_name": "Secret Owner", "username": "secret_ai_user", "password": "UltraSecret@99", "role": "OWNER"},
+    )
+    assert priv.status_code == 201
+    demo_u = client.post(
+        "/api/v1/auth/users",
+        headers=owner_headers,
+        json={"full_name": "Demo Owner", "username": "welcome123", "password": "welcome123", "role": "OWNER"},
+    )
+    assert demo_u.status_code == 201
+    demo_uid = demo_u.json()["id"]
+
+    _setup_private_ai_env(monkeypatch, allowed="secret_ai_user")
+    monkeypatch.setenv("LOOMOS_DEMO_MODE", "true")
+    get_settings.cache_clear()
+    try:
+        # 1. SQLite backup downloaded by non-allowlisted Owner MUST NOT contain secret_ai_user anywhere (even raw bytes!)
+        bak = client.get("/api/v1/backup/sqlite", headers=owner_headers)
+        assert bak.status_code == 200
+        assert b"secret_ai_user" not in bak.content
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tf:
+            tf.write(bak.content)
+            tmp_p = Path(tf.name)
+        try:
+            conn = sqlite3.connect(str(tmp_p))
+            usernames = {r[0] for r in conn.execute("SELECT username FROM users").fetchall()}
+            conn.close()
+            assert "secret_ai_user" not in usernames
+            assert "owner_ram" in usernames
+        finally:
+            tmp_p.unlink(missing_ok=True)
+
+        # 2. Audit logs & CSV export MUST hide secret_ai_user creation row from non-allowlisted Owner
+        logs = client.get("/api/v1/audit-logs?limit=50", headers=owner_headers).json()
+        assert all("secret_ai_user" not in (l.get("new_values_json") or "") for l in logs)
+        csv_bytes = client.get("/api/v1/exports/csv/audit_logs", headers=owner_headers).content
+        assert b"secret_ai_user" not in csv_bytes
+
+        # 3. Demo credential vandalism lock: non-allowlisted Owner cannot change welcome123 password in Demo Mode
+        vandal = client.patch(
+            f"/api/v1/auth/users/{demo_uid}",
+            headers=owner_headers,
+            json={"password": "hijacked_demo_pw"},
+        )
+        assert vandal.status_code == 403
+
+        # 4. Anti-XFF-spoofing + strict 6-attempt lockout on private AI username
+        for i in range(6):
+            r = client.post(
+                "/api/v1/auth/login",
+                headers={"X-Forwarded-For": f"203.0.113.{i}, 198.51.100.77"},
+                json={"username": "secret_ai_user", "password": f"wrong_{i}"},
+            )
+            assert r.status_code == 401
+        blocked = client.post(
+            "/api/v1/auth/login",
+            headers={"X-Forwarded-For": "203.0.113.99, 198.51.100.77"},
+            json={"username": "secret_ai_user", "password": "wrong_again"},
+        )
+        assert blocked.status_code == 429
     finally:
         get_settings.cache_clear()
