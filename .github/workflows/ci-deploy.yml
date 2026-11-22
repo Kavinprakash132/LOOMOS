@@ -1,0 +1,81 @@
+name: LOOMOS CI & Auto-Deploy to Azure
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: loomos-main-deploy
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Build Frontend & Run Backend Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install & build frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Run full pytest verification suite
+        working-directory: backend
+        run: pytest -v
+
+  deploy:
+    name: Deploy to Azure VM
+    needs: verify
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy verified main branch to Azure VM
+        env:
+          AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
+          AZURE_VM_USER: ${{ secrets.AZURE_VM_USER }}
+          AZURE_VM_SSH_KEY: ${{ secrets.AZURE_VM_SSH_KEY }}
+        run: |
+          if [ -z "$AZURE_VM_HOST" ] || [ -z "$AZURE_VM_SSH_KEY" ]; then
+            echo "Skipping Azure deploy: AZURE_VM_HOST or AZURE_VM_SSH_KEY secret is not configured yet."
+            exit 0
+          fi
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$AZURE_VM_SSH_KEY" > ~/.ssh/loomos_deploy_key
+          chmod 600 ~/.ssh/loomos_deploy_key
+          VM_USER="${AZURE_VM_USER:-loomosadmin}"
+          ssh -4 \
+            -i ~/.ssh/loomos_deploy_key \
+            -o StrictHostKeyChecking=accept-new \
+            -o BatchMode=yes \
+            -o ConnectTimeout=20 \
+            -o ServerAliveInterval=15 \
+            -o ServerAliveCountMax=20 \
+            "${VM_USER}@${AZURE_VM_HOST}" \
+            "sudo -n /usr/local/bin/loomos-deploy"
+          rm -f ~/.ssh/loomos_deploy_key

@@ -59,10 +59,46 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 720
     # Allow localhost and private LAN IP origins by default for Choice 1 (Wi-Fi/LAN)
     cors_origins: list[str] = ["*"]
+    # Private In-App LOOMOS AI Copilot (Gemini) — strictly allowlisted usernames only
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-3.5-flash-lite"
+    gemini_pro_model: str = "gemini-3.5-flash"
+    gemini_fallback_models: str = "gemini-3.5-flash-lite,gemini-3.5-flash,gemini-3.6-flash,gemini-3.7-flash"
+    ai_allowed_usernames: str = ""
 
     def is_demo_active(self) -> bool:
         """Return True whenever running against the isolated demo database."""
         return bool(self.demo_mode or self.db_path.name.lower() == "loomos_demo.db")
+
+    def ai_allowed_username_set(self) -> set[str]:
+        """Return lowercase set of usernames explicitly granted private AI Copilot access."""
+        return {u.strip().lower() for u in self.ai_allowed_usernames.split(",") if u.strip()}
+
+    def is_ai_allowed_username(self, username: str) -> bool:
+        return bool(username and username.strip().lower() in self.ai_allowed_username_set())
+
+    def is_ai_allowed_user(self, user: object) -> bool:
+        """Return True ONLY for active OWNER accounts listed in LOOMOS_AI_ALLOWED_USERNAMES."""
+        return bool(
+            getattr(user, "is_active", False)
+            and getattr(user, "role", "") == "OWNER"
+            and self.is_ai_allowed_username(getattr(user, "username", ""))
+        )
+
+    def is_ai_configured(self) -> bool:
+        """Return True when a Gemini API key is configured on this server."""
+        return bool(self.gemini_api_key.strip())
+
+    def ai_model_chain(self, mode: str = "fast") -> list[str]:
+        """Return ordered deduplicated Gemini model chain with automatic fallback."""
+        primary = self.gemini_pro_model.strip() if mode == "deep" else self.gemini_model.strip()
+        secondary = self.gemini_model.strip() if mode == "deep" else self.gemini_pro_model.strip()
+        fallbacks = [m.strip() for m in self.gemini_fallback_models.split(",") if m.strip()]
+        ordered: list[str] = []
+        for m in [primary, secondary, *fallbacks]:
+            if m and m not in ordered:
+                ordered.append(m)
+        return ordered or ["gemini-3.5-flash", "gemini-3.5-flash-lite"]
 
     def resolved_secret_key(self) -> str:
         """Return configured secret key or auto-generate a local persistent secret alongside the DB."""

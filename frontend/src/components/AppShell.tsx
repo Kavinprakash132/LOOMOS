@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { Suspense, lazy, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
   BarChart3,
@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { DemoBanner } from "./DemoBanner";
+
+const AiCopilotDrawer = lazy(() => import("./AiCopilotDrawer"));
 
 interface SubNavItem {
   to: string;
@@ -315,6 +317,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           );
         })}
       </nav>
+
+      {/* Private AI Copilot Drawer — lazy-loaded ONLY for authorized private Owner */}
+      {user?.ai_enabled && (
+        <Suspense fallback={null}>
+          <AiCopilotDrawer />
+        </Suspense>
+      )}
     </div>
   );
 }

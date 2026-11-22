@@ -97,6 +97,7 @@ class UserResponse(BaseModel):
     role: UserRole
     preferred_lang: LangCode
     is_active: bool
+    ai_enabled: bool = False
     created_at: datetime
 
 

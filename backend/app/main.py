@@ -14,7 +14,7 @@ from sqlalchemy import text
 from app.core.config import BACKEND_ROOT, get_settings
 from app.core.database import engine
 from app.core.i18n import get_translations
-from app.routers import analytics, auth, beams, dashboard, data_ops, finance, inspections, masters, payroll, settings as settings_router, setup, shifts
+from app.routers import analytics, assistant, auth, beams, dashboard, data_ops, finance, inspections, masters, payroll, settings as settings_router, setup, shifts
 
 
 def create_app() -> FastAPI:
@@ -60,6 +60,7 @@ def create_app() -> FastAPI:
     app.include_router(dashboard.router)
     app.include_router(inspections.router)
     app.include_router(analytics.router)
+    app.include_router(assistant.router)
 
     @app.get("/api/v1/health", tags=["system"])
     def health_check() -> dict[str, str]:

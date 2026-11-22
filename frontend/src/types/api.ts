@@ -69,7 +69,30 @@ export interface User {
   role: UserRole;
   preferred_lang: LangCode;
   is_active: boolean;
+  ai_enabled?: boolean;
   created_at: string;
+}
+
+export interface PendingAiAction {
+  action_token: string;
+  action_type: string;
+  title: string;
+  summary: string;
+  details: string[];
+}
+
+export interface AssistantChatResponse {
+  reply: string;
+  model_used: string;
+  tools_used: string[];
+  pending_actions: PendingAiAction[];
+}
+
+export interface ExecuteAiActionResponse {
+  status: string;
+  action_type: string;
+  summary: string;
+  result: Record<string, unknown>;
 }
 
 export interface AuthTokenResponse {

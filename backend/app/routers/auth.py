@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.audit import record_audit, snapshot_fields
+from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.security import (
     create_access_token,
@@ -73,6 +74,13 @@ def _clear_login_failures(key: str) -> None:
         _login_failures.pop(key, None)
 
 
+def _serialize_user(user: User) -> UserResponse:
+    cfg = get_settings()
+    resp = UserResponse.model_validate(user)
+    resp.ai_enabled = bool(cfg.is_ai_allowed_user(user) and cfg.is_ai_configured())
+    return resp
+
+
 @router.post("/login", response_model=AuthTokenResponse)
 def login(
     payload: LoginRequest,
@@ -93,13 +101,13 @@ def login(
         )
     _clear_login_failures(rl_key)
     token = create_access_token(user.id, user.username, user.role)
-    return AuthTokenResponse(access_token=token, user=UserResponse.model_validate(user))
+    return AuthTokenResponse(access_token=token, user=_serialize_user(user))
 
 
 @router.get("/me", response_model=UserResponse)
 def get_me(current_user: Annotated[User, Depends(get_current_user)]) -> UserResponse:
     """Return the authenticated user's profile."""
-    return UserResponse.model_validate(current_user)
+    return _serialize_user(current_user)
 
 
 @router.patch("/me/language", response_model=UserResponse)
@@ -112,17 +120,21 @@ def update_my_language(
     current_user.preferred_lang = payload.preferred_lang
     db.commit()
     db.refresh(current_user)
-    return UserResponse.model_validate(current_user)
+    return _serialize_user(current_user)
 
 
 @router.get("/users", response_model=list[UserResponse])
 def list_users(
-    _owner: Annotated[User, Depends(require_owner)],
+    owner: Annotated[User, Depends(require_owner)],
     db: Annotated[Session, Depends(get_db)],
 ) -> list[UserResponse]:
-    """List all Owner and Supervisor accounts (Owner only)."""
+    """List Owner and Supervisor accounts (hiding private AI-allowlisted accounts from non-allowlisted Owners)."""
+    cfg = get_settings()
+    caller_is_ai = cfg.is_ai_allowed_user(owner)
     rows = db.scalars(select(User).order_by(User.id)).all()
-    return [UserResponse.model_validate(r) for r in rows]
+    if not caller_is_ai:
+        rows = [r for r in rows if not cfg.is_ai_allowed_username(r.username)]
+    return [_serialize_user(r) for r in rows]
 
 
 @router.post("/users", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
@@ -132,12 +144,16 @@ def create_user(
     db: Annotated[Session, Depends(get_db)],
 ) -> UserResponse:
     """Create a Supervisor (or additional Owner) account."""
-    if db.scalar(select(User.id).where(User.username == payload.username.strip())):
+    cfg = get_settings()
+    uname = payload.username.strip()
+    if cfg.is_ai_allowed_username(uname) and not cfg.is_ai_allowed_user(owner):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="This username is reserved")
+    if db.scalar(select(User.id).where(User.username == uname)):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Username already exists")
 
     user = User(
         full_name=payload.full_name.strip(),
-        username=payload.username.strip(),
+        username=uname,
         password_hash=hash_password(payload.password),
         role=payload.role,
         preferred_lang=payload.preferred_lang,
@@ -155,7 +171,7 @@ def create_user(
     )
     db.commit()
     db.refresh(user)
-    return UserResponse.model_validate(user)
+    return _serialize_user(user)
 
 
 @router.patch("/users/{user_id}", response_model=UserResponse)
@@ -166,8 +182,11 @@ def update_user(
     db: Annotated[Session, Depends(get_db)],
 ) -> UserResponse:
     """Update a team member's active status, name, language, or password."""
+    cfg = get_settings()
     user = db.get(User, user_id)
     if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    if cfg.is_ai_allowed_username(user.username) and not cfg.is_ai_allowed_user(owner):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     if user.id == owner.id and payload.is_active is False:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cannot deactivate yourself")
@@ -194,4 +213,4 @@ def update_user(
     )
     db.commit()
     db.refresh(user)
-    return UserResponse.model_validate(user)
+    return _serialize_user(user)
