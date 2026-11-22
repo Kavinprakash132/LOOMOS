@@ -83,11 +83,51 @@ export interface PendingAiAction {
   details: string[];
 }
 
+export interface StoredAiActionCard {
+  action_type: string;
+  title: string;
+  summary: string;
+  details: string[];
+  status: "pending" | "executed" | "cancelled" | "expired";
+  feedback?: string | null;
+}
+
 export interface AssistantChatResponse {
   reply: string;
   model_used: string;
   tools_used: string[];
   pending_actions: PendingAiAction[];
+  thread_id?: number | null;
+  thread_title?: string | null;
+  user_message_id?: number | null;
+  assistant_message_id?: number | null;
+}
+
+export interface ChatThreadSummary {
+  id: number;
+  title: string;
+  message_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChatMessageRecord {
+  id: number;
+  role: "user" | "assistant";
+  content: string;
+  has_image: boolean;
+  model_used: string | null;
+  tools_used: string[];
+  actions: StoredAiActionCard[];
+  created_at: string;
+}
+
+export interface ChatThreadDetail {
+  id: number;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  messages: ChatMessageRecord[];
 }
 
 export interface ExecuteAiActionResponse {

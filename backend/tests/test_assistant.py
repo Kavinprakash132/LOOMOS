@@ -287,3 +287,120 @@ def test_redteam_backup_scrub_audit_redaction_xff_spoof_and_demo_lock(
         assert blocked.status_code == 429
     finally:
         get_settings.cache_clear()
+
+
+def test_private_synced_ai_chat_history_isolation_and_backup_scrub(
+    client: TestClient,
+    initialized_owner,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import sqlite3
+    import tempfile
+    from pathlib import Path
+    from app.routers import assistant as assistant_router
+
+    owner_headers, _ = initialized_owner
+
+    # Create private AI owner before restricting allowlist
+    priv = client.post(
+        "/api/v1/auth/users",
+        headers=owner_headers,
+        json={"full_name": "Private AI Owner", "username": "priv_hist_owner", "password": "UltraSecret@99", "role": "OWNER"},
+    )
+    assert priv.status_code == 201
+
+    _setup_private_ai_env(monkeypatch, allowed="priv_hist_owner")
+    get_settings.cache_clear()
+    try:
+        priv_tok = client.post(
+            "/api/v1/auth/login",
+            json={"username": "priv_hist_owner", "password": "UltraSecret@99"},
+        ).json()["access_token"]
+        priv_headers = {"Authorization": f"Bearer {priv_tok}"}
+
+        # Mock run_copilot_chat to return a deterministic reply + a signed action token
+        def fake_run_chat(db, owner, *, message, history, mode, ui_lang, image_bytes=None, image_mime_type=None):
+            from app.services.assistant_service import create_action_token
+
+            card = create_action_token(
+                user_id=owner.id,
+                action_type="record_expense",
+                title="Record Expense",
+                summary="Loom Oil ₹450",
+                details=["Date: 2026-11-22", "Amount: ₹450"],
+                payload={"expense_date": "2026-11-22", "category": "Loom Oil", "amount_paise": 45000, "note": "AI test"},
+            )
+            return {
+                "reply": f"Echo private insight for: {message}",
+                "model_used": "gemini-3.1-flash-lite",
+                "tools_used": ["get_dashboard_summary"],
+                "pending_actions": [card],
+            }
+
+        monkeypatch.setattr(assistant_router, "run_copilot_chat", fake_run_chat)
+
+        # 1. Start a new private chat thread
+        r1 = client.post(
+            "/api/v1/assistant/chat",
+            headers=priv_headers,
+            data={"message": "TOP_SECRET_SHED_MARGIN_QUERY_7788", "mode": "fast", "ui_lang": "en"},
+        )
+        assert r1.status_code == 200, r1.text
+        d1 = r1.json()
+        assert d1["thread_id"] is not None
+        assert d1["assistant_message_id"] is not None
+        tid = d1["thread_id"]
+        aid = d1["assistant_message_id"]
+        act_tok = d1["pending_actions"][0]["action_token"]
+
+        # 2. Execute action with message_id -> persisted thread marks it executed (and never stores raw token)
+        ex = client.post(
+            "/api/v1/assistant/execute",
+            headers=priv_headers,
+            json={"action_token": act_tok, "message_id": aid, "action_index": 0},
+        )
+        assert ex.status_code == 200, ex.text
+
+        # 3. Follow-up on same thread (simulating phone/laptop resume with empty client history_json)
+        r2 = client.post(
+            "/api/v1/assistant/chat",
+            headers=priv_headers,
+            data={"message": "Follow-up on Loom S-01", "thread_id": str(tid), "mode": "fast", "ui_lang": "en"},
+        )
+        assert r2.status_code == 200 and r2.json()["thread_id"] == tid
+
+        # 4. Private owner lists & opens thread
+        threads = client.get("/api/v1/assistant/threads", headers=priv_headers).json()
+        assert len(threads) == 1 and threads[0]["id"] == tid and threads[0]["message_count"] == 4
+        detail = client.get(f"/api/v1/assistant/threads/{tid}", headers=priv_headers).json()
+        assert len(detail["messages"]) == 4
+        assert detail["messages"][1]["actions"][0]["status"] == "executed"
+        assert "action_token" not in detail["messages"][1]["actions"][0]
+
+        # 5. Non-AI Owner (demo owner) is 100% blocked from threads endpoints
+        assert client.get("/api/v1/assistant/threads", headers=owner_headers).status_code == 403
+        assert client.get(f"/api/v1/assistant/threads/{tid}", headers=owner_headers).status_code == 403
+        assert client.delete(f"/api/v1/assistant/threads/{tid}", headers=owner_headers).status_code == 403
+        assert client.delete("/api/v1/assistant/threads", headers=owner_headers).status_code == 403
+
+        # 6. Red-team check: SQLite backup downloaded by non-AI Owner MUST have 0 chat rows AND 0 raw leaked bytes!
+        bak = client.get("/api/v1/backup/sqlite", headers=owner_headers)
+        assert bak.status_code == 200
+        assert b"TOP_SECRET_SHED_MARGIN_QUERY_7788" not in bak.content
+        with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tf:
+            tf.write(bak.content)
+            tmp_p = Path(tf.name)
+        try:
+            conn = sqlite3.connect(str(tmp_p))
+            assert conn.execute("SELECT COUNT(*) FROM ai_chat_threads").fetchone()[0] == 0
+            assert conn.execute("SELECT COUNT(*) FROM ai_chat_messages").fetchone()[0] == 0
+            conn.close()
+        finally:
+            tmp_p.unlink(missing_ok=True)
+
+        # 7. Delete single thread + verify empty
+        del_res = client.delete(f"/api/v1/assistant/threads/{tid}", headers=priv_headers)
+        assert del_res.status_code == 200 and del_res.json()["deleted"] is True
+        assert client.get("/api/v1/assistant/threads", headers=priv_headers).json() == []
+    finally:
+        get_settings.cache_clear()

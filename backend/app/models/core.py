@@ -621,3 +621,47 @@ class Alert(Base):
     __table_args__ = (
         CheckConstraint("status IN ('OPEN', 'ACKNOWLEDGED', 'DISMISSED')", name="ck_alert_status"),
     )
+
+
+class AiChatThread(Base):
+    """Private per-owner LOOMOS AI Copilot conversation thread (auto-pruned, scrubbed from demo backups)."""
+
+    __tablename__ = "ai_chat_threads"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    title: Mapped[str] = mapped_column(String(120), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False, index=True
+    )
+
+    messages: Mapped[list["AiChatMessage"]] = relationship(
+        back_populates="thread",
+        cascade="all, delete-orphan",
+        order_by="AiChatMessage.id",
+    )
+
+
+class AiChatMessage(Base):
+    """Individual text message inside a private LOOMOS AI Copilot thread (images are never stored in DB)."""
+
+    __tablename__ = "ai_chat_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    thread_id: Mapped[int] = mapped_column(
+        ForeignKey("ai_chat_threads.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    role: Mapped[str] = mapped_column(String(16), nullable=False)  # user | assistant
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    has_image: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    model_used: Mapped[str | None] = mapped_column(String(60), nullable=True)
+    tools_used_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    actions_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+
+    thread: Mapped["AiChatThread"] = relationship(back_populates="messages")
+
+    __table_args__ = (
+        CheckConstraint("role IN ('user', 'assistant')", name="ck_ai_chat_msg_role"),
+    )

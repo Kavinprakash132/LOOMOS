@@ -318,6 +318,20 @@ def download_sqlite_backup(
                 priv_names = sorted(cfg.ai_allowed_username_set())
                 placeholders = ",".join("?" for _ in priv_names)
                 cur = dst_conn.cursor()
+                tables = [
+                    r[0]
+                    for r in cur.execute(
+                        "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+                    ).fetchall()
+                ]
+                cur.execute("PRAGMA foreign_keys=OFF")
+                # Always strip private AI Copilot chat history from non-AI backups
+                scrubbed_any = False
+                for chat_tbl in ("ai_chat_messages", "ai_chat_threads"):
+                    if chat_tbl in tables:
+                        cur.execute(f'DELETE FROM "{chat_tbl}"')
+                        scrubbed_any = True
+
                 priv_ids = [
                     r[0]
                     for r in cur.execute(
@@ -326,14 +340,7 @@ def download_sqlite_backup(
                 ]
                 if priv_ids:
                     id_ph = ",".join("?" for _ in priv_ids)
-                    cur.execute("PRAGMA foreign_keys=OFF")
                     # Nullify audit/created_by references before removing private users from the backup copy
-                    tables = [
-                        r[0]
-                        for r in cur.execute(
-                            "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
-                        ).fetchall()
-                    ]
                     for tbl in tables:
                         cols = {c[1] for c in cur.execute(f'PRAGMA table_info("{tbl}")').fetchall()}
                         for col in ("created_by", "deleted_by", "changed_by"):
@@ -344,8 +351,11 @@ def download_sqlite_backup(
                         "UPDATE audit_logs SET reason='Owner update' WHERE reason LIKE '%AI Copilot%'"
                     )
                     cur.execute(f"DELETE FROM users WHERE id IN ({id_ph})", priv_ids)
+                    scrubbed_any = True
+
+                if scrubbed_any:
                     dst_conn.commit()
-                    # VACUUM rewrites all SQLite pages so scrubbed usernames/hashes cannot be recovered from free pages
+                    # VACUUM rewrites all SQLite pages so scrubbed usernames/chats cannot be recovered from free pages
                     dst_conn.execute("VACUUM")
         finally:
             dst_conn.close()
